@@ -21,13 +21,10 @@ https://www.dropbox.com/scl/fo/qqetwthteq18n53p48nwi/ALtsYM3Dse5nW5QfA5KwGEA?rlk
 <ul>
   <li>/경로/datasets
     <ul>
-      <li>HD_dataset</li>
       <li>middlebury</li>
       <li>snufilm</li>
       <li>ucf101</li>
-      <li>vimeo_setuplet</li>
       <li>vimeo_triplet</li>
-      <li>X4K1000FPS</li>
       <li>Xiph</li>
     </ul>
   </li>
