@@ -1,0 +1,12 @@
+cupy==13.2
+packaging
+triton
+timm==0.4.12
+torchmetrics
+opencv-python
+imageio
+einops
+scikit-image
+lpips
+fvcore
+tensorboard
