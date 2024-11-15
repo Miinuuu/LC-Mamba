@@ -2,8 +2,8 @@
 
 
 # conda 환경
-conda  create -n lxfi
-conda activate lxfi
+conda  create -n LC_Mamba
+conda activate LC_Mamba
 
 # pytorch 환경 
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
