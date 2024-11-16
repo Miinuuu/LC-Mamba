@@ -17,6 +17,8 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 ### Library Installation
 ```bash
 pip install -r requirements.txt
+cd kernels/selective_scan && pip install .
+
 ```
 
 ## Checkpoints
