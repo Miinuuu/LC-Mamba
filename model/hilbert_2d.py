@@ -6,13 +6,10 @@ import multiprocessing
 from multiprocessing import Pool
 import numpy as np
 
-
-
 def _binary_repr(num: int, width: int) -> str:
     """Return a binary string representation of `num` zero padded to `width`
     bits."""
     return format(num, 'b').zfill(width)
-
 
 class HilbertCurve:
 
@@ -304,99 +301,11 @@ def apply_hilbert_curve_2d(tensor,sorted_indices):
         inverse_indices: 원래 순서로 복원하기 위한 인덱스 배열
     """
     B, C, H, W = tensor.shape
-    # L = H * W  # 픽셀 수
-    # # 힐베르트 곡선의 차원과 단계 설정
-    # p = int(np.ceil(np.log2(max(H, W))))  # 힐베르트 곡선의 단계 (order)
-    # n = 2  # 2차원
-
-    # # 힐베르트 곡선 객체 생성
-    # hilbert_curve = HilbertCurve(p, n)
-
-    # # 힐베르트 곡선의 전체 좌표 계산
-    # coords = []
-    # for y in range(H):
-    #     for x in range(W):
-    #         coords.append((x, y))
-
-    # # 각 좌표에 대한 힐베르트 인덱스 계산
-    # hilbert_indices = []
-    # for coord in coords:
-    #     x, y = coord
-    #     # 힐베르트 곡선의 크기에 맞게 좌표 조정
-    #     hilbert_index = hilbert_curve.distance_from_point([x, y])
-    #     hilbert_indices.append(hilbert_index)
-
-    # # 힐베르트 인덱스에 따라 정렬
-    # hilbert_indices = np.array(hilbert_indices)
-    # sorted_indices = np.argsort(hilbert_indices)
-    # # 역순서 인덱스 계산
-    # inverse_indices = np.argsort(sorted_indices)
-
-    # 입력 텐서를 힐베르트 순서로 재배열
     tensor_flat = tensor.view(B,  C, -1) # (B,K, C, H*W)
     hilbert_tensor = tensor_flat[: , : , sorted_indices] # (B,K, C,L)
 
     return hilbert_tensor.contiguous() 
-    #, inverse_indices
 
-# def apply_hilbert_curve(tensor):
-#     """
-#     입력:
-#         tensor: (B, C, H, W) 형태의 텐서
-#     출력:
-#         hilbert_tensor: 힐베르트 곡선 순서로 재배열된 텐서, shape은 (B, C, N)
-#         inverse_indices: 원래 순서로 복원하기 위한 인덱스 배열
-#     """
-#     B, K,C, H, W = tensor.shape
-#     L = H * W  # 픽셀 수
-#     # 힐베르트 곡선의 차원과 단계 설정
-#     p = int(np.ceil(np.log2(max(H, W))))  # 힐베르트 곡선의 단계 (order)
-#     n = 2  # 2차원
-
-#     # 힐베르트 곡선 객체 생성
-#     hilbert_curve = HilbertCurve(p, n)
-
-#     # 힐베르트 곡선의 전체 좌표 계산
-#     coords = []
-#     for y in range(H):
-#         for x in range(W):
-#             coords.append((x, y))
-
-#     # 각 좌표에 대한 힐베르트 인덱스 계산
-#     hilbert_indices = []
-#     for coord in coords:
-#         x, y = coord
-#         # 힐베르트 곡선의 크기에 맞게 좌표 조정
-#         hilbert_index = hilbert_curve.distance_from_point([x, y])
-#         hilbert_indices.append(hilbert_index)
-
-#     # 힐베르트 인덱스에 따라 정렬
-#     hilbert_indices = np.array(hilbert_indices)
-#     sorted_indices = np.argsort(hilbert_indices)
-#     # 역순서 인덱스 계산
-#     inverse_indices = np.argsort(sorted_indices)
-
-#     # 입력 텐서를 힐베르트 순서로 재배열
-#     tensor_flat = tensor.view(B, K, C, -1)  # (B,K, C, H*W)
-#     hilbert_tensor = tensor_flat[:, : , : , sorted_indices]  # (B,K, C,L)
-
-#     return hilbert_tensor, inverse_indices
-
-# def reverse_hilbert_curve(hilbert_tensor, inverse_indices, H, W):
-#     """
-#     입력:
-#         hilbert_tensor: 힐베르트 곡선 순서로 정렬된 텐서, shape은 (B, C, N)
-#         inverse_indices: 원래 순서로 복원하기 위한 인덱스 배열
-#         H, W: 원래 이미지의 높이와 너비
-#     출력:
-#         tensor: 원래의 (B, C, H, W) 형태의 텐서
-#     """
-#     B, K, C, N = hilbert_tensor.shape
-#     # 원래 순서로 재배열
-#     tensor_flat = hilbert_tensor[:, :, :,inverse_indices]  # (B, K,C, N)
-#     # 원래의 이미지 형태로 변환
-#     tensor = tensor_flat.view(B,K, C, H, W)
-#     return tensor
 def reverse_hilbert_curve_2d(hilbert_tensor, inverse_indices, H, W):
     """
     입력:
@@ -417,11 +326,8 @@ def reverse_hilbert_curve_2d(hilbert_tensor, inverse_indices, H, W):
 if __name__ == "__main__":
     B, C, H, W = 1, 3, 8, 8  # 예제 크기
 
-
-    p = int(np.log2(8))  # 힐베르트 곡선의 단계 (order)
+    p = int(np.log2(H))  # 힐베르트 곡선의 단계 (order)
     n = 2  # 2차원
-
-    H,W=8,8
 
     # 힐베르트 곡선 객체 생성
     hilbert_curve = HilbertCurve(p, n)
@@ -434,6 +340,7 @@ if __name__ == "__main__":
 
     # 각 좌표에 대한 힐베르트 인덱스 계산
     hilbert_indices = []
+    
     for coord in coords:
         x, y = coord
         # 힐베르트 곡선의 크기에 맞게 좌표 조정
@@ -445,10 +352,6 @@ if __name__ == "__main__":
     sorted_indices = np.argsort(hilbert_indices)
     # 역순서 인덱스 계산
     inverse_indices = np.argsort( sorted_indices)
-
-
-
-
 
     tensor = torch.randn(B, C, H, W)
     tensor_wh = torch.transpose(tensor,-1,-2)

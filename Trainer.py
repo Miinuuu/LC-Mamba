@@ -9,12 +9,10 @@ from model.utils import *
 
 ############################################################################################################################
 ############################################################################################################################
+
 class Model:
     def __init__(self, local_rank, 
                  MODEL_CONFIG):
-        self.distill = MODEL_CONFIG['DISTILL']
-        self.base =  MODEL_CONFIG['BASE']
-
 
         self.lap = LapLoss()
         self.l1_loss = Charbonnier_L1()
@@ -46,17 +44,10 @@ class Model:
 
     def device(self,):
         self.net.to(torch.device("cuda"))
-        if self.base != None:
-            self.netB.to(torch.device("cuda"))
-        if self.distill != None:
-            self.netD.to(torch.device("cuda"))
 
     def eval(self,):
         self.net.eval()
-        if self.base != None:
-            self.netB.eval()
-        if self.distill != None:
-            self.netD.eval()
+
 
     def convert(self, param):
             return {
@@ -153,20 +144,19 @@ class Model:
 
 
     @torch.no_grad()
-    def inference(self, img0, gt=None,img1=None, TTA = False, timestep = 0.5, fast_TTA = False):
+    def inference(self, img0,img1=None, TTA = False, timestep = 0.5, fast_TTA = False):
         
         imgs = torch.cat((img0, img1), 1)
         '''
         Noting: return BxCxHxW
         '''
-        flow_list, mask_list, _, pred = self.net(imgs, gt,timestep=timestep)
-        flow=flow_list[-1]
-        mask=mask_list[-1]
+        flow_list, mask_list, _, pred = self.net(imgs,timestep=timestep)
 
-        return pred,flow,mask
+
+        return pred
          
     @torch.no_grad()
-    def hr_inference(self, img0, gt=None, img1=None, TTA = False, down_scale = 1.0, timestep = 0.5, fast_TTA = False,local=False):
+    def hr_inference(self, img0, img1=None, TTA = False, down_scale = 1.0, timestep = 0.5, fast_TTA = False,local=False):
         '''
         Infer with down_scale flow
         Noting: return BxCxHxW
@@ -180,14 +170,10 @@ class Model:
             flow = F.interpolate(flow, scale_factor = 1/down_scale, mode="bilinear", align_corners=False) * (1/down_scale)
             mask = F.interpolate(mask, scale_factor = 1/down_scale, mode="bilinear", align_corners=False)
 
-            afmf= self.net.feature_bone(img0,img1)
-            if isinstance(afmf, tuple):
-                af,mf =afmf
-            else:
-                af=afmf 
-
+            af= self.net.feature_bone(img0,img1)
+      
             pred = self.net.coraseWarp_and_Refine(imgs, af, flow, mask)
-            return pred,flow,torch.sigmoid(mask)
+            return pred
 
         imgs = torch.cat((img0, img1), 1)
         return infer(imgs)
@@ -246,9 +232,7 @@ class Model:
         preds ,flows,masks=  infer(imgs)
 
 
-        return   [preds[i][0] for i in range(len(time_list))], \
-                 [flows[i][0] for i in range(len(time_list))]  \
-                ,[masks[i][0] for i in range(len(time_list))]
+        return   [preds[i][0] for i in range(len(time_list))]
 
 
 
@@ -263,7 +247,7 @@ class Model:
 
         if training:
 
-            flow_list, mask_list, merged, pred = self.net(imgs,None,timestep)
+            flow_list, mask_list, merged, pred = self.net(imgs,timestep)
 
             lap_loss = (self.lap(pred, gt)).mean() 
 
@@ -285,7 +269,6 @@ class Model:
         
         else: 
             with torch.no_grad():
-                flow_list, mask_list, merged, pred= self.net(imgs,None,timestep)
-                return pred,flow_list[-1],mask_list[-1]
-            
+                flow_list, mask_list, merged, pred= self.net(imgs,timestep)
+                return pred
             
