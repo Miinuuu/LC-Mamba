@@ -23,9 +23,10 @@ class LC_Mamba_Block(nn.Module):
         super().__init__()
         print('LC_Mamba_Block')
 
+
         self.window_size=window_size
         self.shift_size=shift_size
-
+        
         if not isinstance(self.window_size, (tuple, list)):
             self.window_size = to_2tuple(window_size)
 
