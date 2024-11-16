@@ -57,7 +57,7 @@ class LC_Mamba_LFE_STFE(nn.Module):
                                     d_state=d_state,
                                     expand=expand,
                                     window_size = window_sizes,
-                                    shift_size = window_shift * (0 if j%2 ==0 else window_sizes[i-self.conv_stages]//2), 
+                                    shift_size =  0 if window_shift==-1  else  (0 if j%2 ==0 else window_sizes[i-self.conv_stages]//2), 
                                     )for j in range(depths[i])])
 
 
@@ -69,7 +69,7 @@ class LC_Mamba_LFE_STFE(nn.Module):
                                     d_state=d_state,
                                     expand=expand,
                                     window_size =window_sizes,
-                                    shift_size = window_shift * (0 if j%2 ==0 else window_sizes[i-self.conv_stages]//2), 
+                                    shift_size =  0 if window_shift==-1  else  (0 if j%2 ==0 else window_sizes[i-self.conv_stages]//2), 
                                     )for j in range(depths[i])])
                          
 
