@@ -1,2 +1,1 @@
-2024-11-16 18:40:49,676 - INFO - {'model': 'Ours-E', 'ckpt': 'Ours-E'}
-2024-11-16 18:57:06,782 - INFO - {'Dataset': 'Xiph-2K', 'Avg PSNR': 36.676806824852925, 'Avg SSIM': 0.9437874867416887, 'Avg LPIPS': 0.15402078214196527, 'Avg FloLPIPS': 0.1310106032998396}
+2024-11-16 19:19:55,199 - INFO - {'model': 'Ours-E', 'ckpt': 'Ours-E'}

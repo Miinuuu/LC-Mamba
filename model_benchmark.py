@@ -78,7 +78,7 @@ def bench (model,args ):
                     npyEstimate =model.hr_inference(tenFirst_p,tenSecond_p, timestep=timestep,down_scale=down_scale)
                     npyEstimate=npyEstimate.clamp(0.0, 1.0)
                     npyEstimate = padder.unpad(npyEstimate)
-                    lpips= lpips_fn(tenGt,npyEstimate).item()
+                    lpips= lpips_fn(tenGt*2-1,npyEstimate*2-1).item()
                     flolpips= flolpips_fn(tenFirst,tenSecond,npyEstimate,tenGt).item()
                     
                     npyEstimate = (npyEstimate[0].cpu().numpy().transpose(1, 2, 0) * 255.0).round().astype(np.uint8)
@@ -167,7 +167,7 @@ def bench (model,args ):
 
                 fltPsnr.append(-10 * math.log10(torch.mean((tenEstimate - tenGT) * (tenEstimate - tenGT)).cpu().data))
                 fltSsim.append(ssim_matlab(tenEstimate,tenGT).detach().cpu().numpy())
-                fltLpips.append(lpips_fn(tenGT,tenEstimate).item())
+                fltLpips.append(lpips_fn(tenGT*2-1,tenEstimate*2-1).item())
                 fltfloLpips.append(flolpips_fn(tenOne,tenTwo,tenEstimate,tenGT).item())
 
 
@@ -264,7 +264,7 @@ def bench (model,args ):
 
 
                 
-            lpips_list.append(lpips_fn(gt,mid).item())
+            lpips_list.append(lpips_fn(gt*2-1,mid*2-1).item())
             flolpips_list.append(flolpips_fn(I0,I2,mid,gt).item())
             mid=mid[0]
             ssim = ssim_matlab(torch.tensor(I1.transpose(2, 0, 1)).cuda().unsqueeze(0) / 255., mid.unsqueeze(0)).detach().cpu().numpy()
@@ -300,7 +300,7 @@ def bench (model,args ):
             gt = (torch.tensor(cv2.imread(gt).transpose(2, 0, 1) / 255.)).cuda().float().unsqueeze(0)
             timestep = torch.tensor(0.5).reshape(1, 1, 1).unsqueeze(0).cuda()
             pred = model.inference(img0, img1, timestep=timestep)
-            lpips_list.append(lpips_fn(pred,gt).item())
+            lpips_list.append(lpips_fn(pred*2-1,gt*2-1).item())
             floLpips_list.append(flolpips_fn(img0,img1,pred,gt).item())
 
             pred=pred[0]
@@ -360,7 +360,7 @@ def bench (model,args ):
                 I0_p, I2_p = padder.pad(I0, I2)
                 I1_pred = model.hr_inference(I0_p, I2_p, timestep=timestep, down_scale = down_scale)
                 I1_pred = padder.unpad(I1_pred)
-                lpips_list.append(lpips_fn(I1_pred,I1).item())
+                lpips_list.append(lpips_fn(I1_pred*2-1,I1*2-1).item())
                 flolpips_list.append(flolpips_fn(I0,I2,I1_pred,I1).item())
                 
                 ssim = ssim_matlab(I1, I1_pred).detach().cpu().numpy()
