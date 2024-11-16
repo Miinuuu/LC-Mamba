@@ -31,8 +31,8 @@ class SW_HSS3D(nn.Module):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         print('SW_HSS3D')
-        print(window_size)
-        print(shift_size)
+        print('window_size',window_size)
+        print('shift_size',shift_size)
         self.d_model = d_model
         self.d_state = d_state
         self.d_conv = d_conv
