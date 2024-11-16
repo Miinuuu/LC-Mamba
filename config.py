@@ -45,9 +45,8 @@ def Model_create(model=None):
             refine=Residual_refiner,
             W=[8,8],
             depth = [2,2,2,4,4])
-        ,'DISTILL' : None
-        ,'BASE':None
         }
+        
     elif model in ['Ours-B'] :
         
         MODEL_CONFIG = {
