@@ -2,10 +2,8 @@ import torch
 import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
-from model.loss import *
 import os 
 import re
-from model.utils import *
 
 ############################################################################################################################
 ############################################################################################################################
@@ -13,10 +11,6 @@ from model.utils import *
 class Model:
     def __init__(self, local_rank, 
                  MODEL_CONFIG):
-
-        self.lap = LapLoss()
-        self.l1_loss = Charbonnier_L1()
-        self.tr_loss = Ternary(7)
 
         self.find_unused_parameters=MODEL_CONFIG['find_unused_parameters']
         self.name = MODEL_CONFIG['LOGNAME']
@@ -150,7 +144,7 @@ class Model:
         '''
         Noting: return BxCxHxW
         '''
-        flow_list, mask_list, _, pred = self.net(imgs,timestep=timestep)
+        _, _, _, pred = self.net(imgs,timestep=timestep)
 
 
         return pred
@@ -224,51 +218,13 @@ class Model:
                 flow_list.append(flow)
                 mask_list.append(torch.sigmoid(mask))
 
-            return pred_list,flow_list,mask_list
+            return pred_list
        
 
         imgs = torch.cat((img0, img1), 1)
 
-        preds ,flows,masks=  infer(imgs)
+        preds =  infer(imgs)
 
 
         return   [preds[i][0] for i in range(len(time_list))]
 
-
-
-    def update(self, imgs, gt,learning_rate=0,timestep=0.5, training=True):
-                
-        for param_group in self.optimG.param_groups:
-            param_group['lr'] = learning_rate
-        if training:
-            self.net.train()
-        else:
-            self.net.eval()
-
-        if training:
-
-            flow_list, mask_list, merged, pred = self.net(imgs,timestep)
-
-            lap_loss = (self.lap(pred, gt)).mean() 
-
-            l=(len(merged))
-            ld = 1 / l
-
-            for merge in merged:
-                
-                lap_loss += (self.lap(merge, gt)).mean() * ld
-
-            loss_rec = self.l1_loss(pred , gt) + self.tr_loss(pred, gt)+lap_loss
-            
-            loss = loss_rec 
-            
-            self.optimG.zero_grad()
-            loss.backward()
-            self.optimG.step()
-            return pred, loss
-        
-        else: 
-            with torch.no_grad():
-                flow_list, mask_list, merged, pred= self.net(imgs,timestep)
-                return pred
-            
