@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import wandb as wandb
-from .residual_refiner import *
+from .Residual_refiner import *
 from .layers import * 
 from .visualize import * 
 from .warplayer import * 
