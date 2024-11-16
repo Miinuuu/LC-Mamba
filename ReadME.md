@@ -1,58 +1,68 @@
+
 # LC-Mamba
 
+## Environment Setup
 
-# conda 환경
-conda  create -n LC_Mamba
+### Conda Environment
+```bash
+conda create -n LC_Mamba
 conda activate LC_Mamba
+```
 
-# pytorch 환경 
+### PyTorch Installation
+```bash
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+```
 
-# library 환경 
+### Library Installation
+```bash
 pip install -r requirements.txt
+```
 
+## Checkpoints
+Checkpoints can be downloaded from the following link:  
+[Download Checkpoints](https://www.dropbox.com/scl/fo/qqetwthteq18n53p48nwi/ALtsYM3Dse5nW5QfA5KwGEA?rlkey=lhcev43r7ltvv80cr3iszj6nj&dl=0)
 
-# 체크포인트
-https://www.dropbox.com/scl/fo/qqetwthteq18n53p48nwi/ALtsYM3Dse5nW5QfA5KwGEA?rlkey=lhcev43r7ltvv80cr3iszj6nj&dl=0
-  
-# 데이터셋
-본 연구에서는 제안된 모델의 성능을 다양한 조건과 해상도에서 종합적으로 검증하기 위해 여러 데이터셋을 활용하여 실험을 수행하였습니다. 
+## Dataset
+To comprehensively evaluate the proposed model's performance under various conditions and resolutions, experiments were conducted using multiple datasets.
 
-<ul>
-  <li>/경로/datasets
-    <ul>
-      <li>middlebury</li>
-      <li>snufilm</li>
-      <li>ucf101</li>
-      <li>vimeo_triplet</li>
-      <li>Xiph</li>
-    </ul>
-  </li>
-</ul>
+### Dataset Structure
+```
+/data/datasets/
+  ├── middlebury
+  ├── snufilm
+  ├── ucf101
+  ├── vimeo_triplet
+  ├── Xiph
+```
 
+### Dataset Preparation
+The following datasets were used:
 
+- **[Vimeo90K dataset](http://toflow.csail.mit.edu/):**  
+  Consists of frame triplets with a resolution of 448×256. The test set includes 3,782 triplets.
 
-## 데이터셋 준비:
+- **[UCF101 dataset](https://liuziwei7.github.io/projects/VoxelFlow):**  
+  The test set contains 379 frame triplets selected from DVF, with a resolution of 256×256.
 
-   * [Vimeo90K dataset](http://toflow.csail.mit.edu/)
-   * [UCF101 dataset](https://liuziwei7.github.io/projects/VoxelFlow)
-   * [Xiph dataset](https://github.com/sniklaus/softmax-splatting/blob/master/benchmark_xiph.py)
-   * [MiddleBury OTHER dataset](https://vision.middlebury.edu/flow/data/)
-   * [SNU-FILM dataset](https://myungsub.github.io/CAIN/)
+- **[Xiph dataset](https://github.com/sniklaus/softmax-splatting/blob/master/benchmark_xiph.py):**  
+  The original images were downsampled to 2K resolution as "Xiph-2K" and cropped centrally to form "Xiph-4K" for testing.
 
+- **[Middlebury OTHER dataset](https://vision.middlebury.edu/flow/data/):**  
+  The OTHER set, with a resolution of approximately 640×480, was used for testing.
 
-1) Vimeo90K 는 448×256 해상도의 프레임 트리플릿으로 구성된 데이터셋으로, 테스트 세트에는 총 3,782개의 트리플릿이 포함되어 있습니다. 
-2) UCF101 은 DVF 에서 선정한 256×256 해상도의 프레임 트리플릿 379개로 구성된 테스트 세트를 사용하였습니다.
-3) Middlebury 는 해상도가 약 640×480인 OTHER 세트를 테스트용으로 활용하였습니다. 
-4) SNU-FILM 은 약 1280×720 해상도의 프레임 트리플릿 1,240개로 이루어진 데이터셋으로, 
-   움직임의 크기에 따라 Easy, Medium, Hard, Extreme의 네 가지 난이도로 구분되어 있어 상세한 성능 비교가 가능합니다.
-5) Xiph 는 원본 이미지를 2K 해상도로 다운샘플링한 “Xiph-2K”와 중앙을 크롭한 “Xiph-4K” 버전으로 구성하여 테스트에 사용하였습니다. 
+- **[SNU-FILM dataset](https://myungsub.github.io/CAIN/):**  
+  This dataset consists of 1,240 frame triplets with a resolution of approximately 1280×720. It is categorized into four difficulty levels—Easy, Medium, Hard, and Extreme—based on motion magnitude, enabling detailed performance comparisons.
 
-# 실행
-    Makefile
-## 훈련 
-    Make train
-## 벤치
-    Make bench
-## 데모
-    Make demo
+### Benchmarks
+Run the benchmark using the following command:
+```bash
+Make bench_Ours-E
+```
+
+## License and Acknowledgement
+
+This project is released under the **Apache 2.0 license**. 
+The code is based on **RIFE**, **EMA-VFI**,  and **VFIMamba**. Please ensure compliance with their respective licenses. 
+
+We would like to thank the authors of these projects for their outstanding contributions.
