@@ -37,6 +37,86 @@ def bench (model,args ):
     logger.setLevel(logging.INFO)  # 로그 레벨 설정 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     logger.info({ "model" : args.model , "ckpt" : args.resume })
 
+    if  'Vimeo90K' in args.bench:
+
+        print(f'=========================Starting testing=========================')
+        print(f'Dataset: Vimeo90K triplet   Model: {args.model}   TTA: {False}')
+        #path = '/data/dataset/vimeo_dataset/vimeo_triplet'
+        path=os.path.join(args.datasets_path,'vimeo_triplet')
+        f = open(path + '/tri_testlist.txt', 'r')
+        psnr_list, ssim_list ,lpips_list,flolpips_list= [], [],[],[]
+
+        for n,i in enumerate(tqdm(f)):
+            name = str(i).strip()
+            if(len(name) <= 1):
+                continue
+            I0 = cv2.imread(path + '/sequences/' + name + '/im1.png')
+            I1 = cv2.imread(path + '/sequences/' + name + '/im2.png')
+            I2 = cv2.imread(path + '/sequences/' + name + '/im3.png') # BGR -> RBGW
+            I0 = (torch.tensor(I0.transpose(2, 0, 1)).cuda() / 255.).unsqueeze(0)
+            gt = (torch.tensor(I1.transpose(2, 0, 1)).cuda() / 255.).unsqueeze(0)
+            I2 = (torch.tensor(I2.transpose(2, 0, 1)).cuda() / 255.).unsqueeze(0)
+            timestep = torch.tensor(0.5).reshape(1, 1, 1).unsqueeze(0).cuda()
+            mid  = model.inference(I0, I2,timestep=timestep)
+
+
+                
+            lpips_list.append(lpips_fn(mid*2-1,gt*2-1).item())
+            flolpips_list.append(flolpips_fn(I0,I2,mid,gt).item())
+            mid=mid[0]
+            ssim = ssim_matlab(torch.tensor(I1.transpose(2, 0, 1)).cuda().unsqueeze(0) / 255., mid.unsqueeze(0)).detach().cpu().numpy()
+            mid = mid.detach().cpu().numpy().transpose(1, 2, 0) 
+            I1 = I1 / 255.
+            psnr = -10 * math.log10(((I1 - mid) * (I1 - mid)).mean())
+            psnr_list.append(psnr)
+            ssim_list.append(ssim)
+
+        
+
+
+        print("Avg PSNR: {} SSIM: {} LPIPS {} FloLPIPS {}".format(np.mean(psnr_list), np.mean(ssim_list), np.mean(lpips_list), np.mean(flolpips_list)))
+        logger.info({'Dataset': 'Vimeo90K', 'Avg PSNR' : np.mean(psnr_list),"Avg SSIM" : np.mean(ssim_list), "Avg LPIPS" : np.mean(lpips_list), "Avg FloLPIPS" : np.mean(flolpips_list)})
+
+        torch.cuda.empty_cache()
+
+    if  'UCF101' in args.bench:
+        print(f'=========================Starting testing=========================')
+        print(f'Dataset: UCF101   Model: {args.model}   TTA: {False}')
+            
+        #path = '/data/dataset/ucf101'
+        path=os.path.join(args.datasets_path,'ucf101')
+        #print(path)
+        dirs = os.listdir(path)
+        psnr_list, ssim_list ,lpips_list,floLpips_list = [], [], [], []
+        for d in tqdm(dirs):
+            img0 = (path + '/' + d + '/frame_00.png')
+            img1 = (path + '/' + d + '/frame_02.png')
+            gt = (path + '/' + d + '/frame_01_gt.png')
+            img0 = (torch.tensor(cv2.imread(img0).transpose(2, 0, 1) / 255.)).cuda().float().unsqueeze(0)
+            img1 = (torch.tensor(cv2.imread(img1).transpose(2, 0, 1) / 255.)).cuda().float().unsqueeze(0)
+            gt = (torch.tensor(cv2.imread(gt).transpose(2, 0, 1) / 255.)).cuda().float().unsqueeze(0)
+            timestep = torch.tensor(0.5).reshape(1, 1, 1).unsqueeze(0).cuda()
+            pred = model.inference(img0, img1, timestep=timestep)
+            lpips_list.append(lpips_fn(pred*2-1,gt*2-1).item())
+            floLpips_list.append(flolpips_fn(img0,img1,pred,gt).item())
+
+            pred=pred[0]
+            ssim = ssim_matlab(gt, torch.round(pred * 255).unsqueeze(0) / 255.).detach().cpu().numpy()
+            out = pred.detach().cpu().numpy().transpose(1, 2, 0)
+            out = np.round(out * 255) / 255.
+            gt = gt[0].cpu().numpy().transpose(1, 2, 0)
+            psnr = -10 * math.log10(((gt - out) * (gt - out)).mean())
+            psnr_list.append(psnr)
+            ssim_list.append(ssim)
+        print("Avg PSNR: {} SSIM: {} LPIPS: {} FloLPIPS : {}".format(np.mean(psnr_list), np.mean(ssim_list), np.mean(lpips_list), np.mean(floLpips_list)))
+        logger.info({'Dataset': 'UCF101', 
+                     'Avg PSNR' : np.mean(psnr_list) ,  
+                     "Avg SSIM" : np.mean(ssim_list),
+                     "Avg LPIPS" : np.mean(lpips_list),
+                     "Avg FloLPIPS" : np.mean(floLpips_list),
+                     } )
+
+
     if  'Xiph' in args.bench:
         print(f'=========================Starting testing=========================')
         print(f'Dataset: Xiph   Model: {args.model} TTA: {False}')
@@ -78,7 +158,7 @@ def bench (model,args ):
                     npyEstimate =model.hr_inference(tenFirst_p,tenSecond_p, timestep=timestep,down_scale=down_scale)
                     npyEstimate=npyEstimate.clamp(0.0, 1.0)
                     npyEstimate = padder.unpad(npyEstimate)
-                    lpips= lpips_fn(tenGt*2-1,npyEstimate*2-1).item()
+                    lpips= lpips_fn(npyEstimate*2-1,tenGt*2-1).item()
                     flolpips= flolpips_fn(tenFirst,tenSecond,npyEstimate,tenGt).item()
                     
                     npyEstimate = (npyEstimate[0].cpu().numpy().transpose(1, 2, 0) * 255.0).round().astype(np.uint8)
@@ -167,7 +247,7 @@ def bench (model,args ):
 
                 fltPsnr.append(-10 * math.log10(torch.mean((tenEstimate - tenGT) * (tenEstimate - tenGT)).cpu().data))
                 fltSsim.append(ssim_matlab(tenEstimate,tenGT).detach().cpu().numpy())
-                fltLpips.append(lpips_fn(tenGT*2-1,tenEstimate*2-1).item())
+                fltLpips.append(lpips_fn(tenEstimate*2-1,tenGT*2-1).item())
                 fltfloLpips.append(flolpips_fn(tenOne,tenTwo,tenEstimate,tenGT).item())
 
 
@@ -240,86 +320,6 @@ def bench (model,args ):
         print('PSNR: {}(544*1280), {}(720p), {}(1080p)'.format(np.mean(tot[7:11]), np.mean(tot[:3]), np.mean(tot[3:7])))
         logger.info({'Dataset': 'HD_4X' , '(544*1280) Avg PSNR' : np.mean(tot[7:11]) ,  '(720p) Avg PSNR' : np.mean(tot[:3]) ,  '(1080p) Avg PSNR' : np.mean(tot[3:7])} )
         
-    if  'Vimeo90K' in args.bench:
-
-        print(f'=========================Starting testing=========================')
-        print(f'Dataset: Vimeo90K triplet   Model: {args.model}   TTA: {False}')
-        #path = '/data/dataset/vimeo_dataset/vimeo_triplet'
-        path=os.path.join(args.datasets_path,'vimeo_triplet')
-        f = open(path + '/tri_testlist.txt', 'r')
-        psnr_list, ssim_list ,lpips_list,flolpips_list= [], [],[],[]
-
-        for n,i in enumerate(tqdm(f)):
-            name = str(i).strip()
-            if(len(name) <= 1):
-                continue
-            I0 = cv2.imread(path + '/sequences/' + name + '/im1.png')
-            I1 = cv2.imread(path + '/sequences/' + name + '/im2.png')
-            I2 = cv2.imread(path + '/sequences/' + name + '/im3.png') # BGR -> RBGW
-            I0 = (torch.tensor(I0.transpose(2, 0, 1)).cuda() / 255.).unsqueeze(0)
-            gt = (torch.tensor(I1.transpose(2, 0, 1)).cuda() / 255.).unsqueeze(0)
-            I2 = (torch.tensor(I2.transpose(2, 0, 1)).cuda() / 255.).unsqueeze(0)
-            timestep = torch.tensor(0.5).reshape(1, 1, 1).unsqueeze(0).cuda()
-            mid  = model.inference(I0, I2,timestep=timestep)
-
-
-                
-            lpips_list.append(lpips_fn(gt*2-1,mid*2-1).item())
-            flolpips_list.append(flolpips_fn(I0,I2,mid,gt).item())
-            mid=mid[0]
-            ssim = ssim_matlab(torch.tensor(I1.transpose(2, 0, 1)).cuda().unsqueeze(0) / 255., mid.unsqueeze(0)).detach().cpu().numpy()
-            mid = mid.detach().cpu().numpy().transpose(1, 2, 0) 
-            I1 = I1 / 255.
-            psnr = -10 * math.log10(((I1 - mid) * (I1 - mid)).mean())
-            psnr_list.append(psnr)
-            ssim_list.append(ssim)
-
-        
-
-
-        print("Avg PSNR: {} SSIM: {} LPIPS {} FloLPIPS {}".format(np.mean(psnr_list), np.mean(ssim_list), np.mean(lpips_list), np.mean(flolpips_list)))
-        logger.info({'Dataset': 'Vimeo90K', 'Avg PSNR' : np.mean(psnr_list),"Avg SSIM" : np.mean(ssim_list), "Avg LPIPS" : np.mean(lpips_list), "Avg FloLPIPS" : np.mean(flolpips_list)})
-
-        torch.cuda.empty_cache()
-
-    if  'UCF101' in args.bench:
-        print(f'=========================Starting testing=========================')
-        print(f'Dataset: UCF101   Model: {args.model}   TTA: {False}')
-            
-        #path = '/data/dataset/ucf101'
-        path=os.path.join(args.datasets_path,'ucf101')
-        #print(path)
-        dirs = os.listdir(path)
-        psnr_list, ssim_list ,lpips_list,floLpips_list = [], [], [], []
-        for d in tqdm(dirs):
-            img0 = (path + '/' + d + '/frame_00.png')
-            img1 = (path + '/' + d + '/frame_02.png')
-            gt = (path + '/' + d + '/frame_01_gt.png')
-            img0 = (torch.tensor(cv2.imread(img0).transpose(2, 0, 1) / 255.)).cuda().float().unsqueeze(0)
-            img1 = (torch.tensor(cv2.imread(img1).transpose(2, 0, 1) / 255.)).cuda().float().unsqueeze(0)
-            gt = (torch.tensor(cv2.imread(gt).transpose(2, 0, 1) / 255.)).cuda().float().unsqueeze(0)
-            timestep = torch.tensor(0.5).reshape(1, 1, 1).unsqueeze(0).cuda()
-            pred = model.inference(img0, img1, timestep=timestep)
-            lpips_list.append(lpips_fn(pred*2-1,gt*2-1).item())
-            floLpips_list.append(flolpips_fn(img0,img1,pred,gt).item())
-
-            pred=pred[0]
-            ssim = ssim_matlab(gt, torch.round(pred * 255).unsqueeze(0) / 255.).detach().cpu().numpy()
-            out = pred.detach().cpu().numpy().transpose(1, 2, 0)
-            out = np.round(out * 255) / 255.
-            gt = gt[0].cpu().numpy().transpose(1, 2, 0)
-            psnr = -10 * math.log10(((gt - out) * (gt - out)).mean())
-            psnr_list.append(psnr)
-            ssim_list.append(ssim)
-        print("Avg PSNR: {} SSIM: {} LPIPS: {} FloLPIPS : {}".format(np.mean(psnr_list), np.mean(ssim_list), np.mean(lpips_list), np.mean(floLpips_list)))
-        logger.info({'Dataset': 'UCF101', 
-                     'Avg PSNR' : np.mean(psnr_list) ,  
-                     "Avg SSIM" : np.mean(ssim_list),
-                     "Avg LPIPS" : np.mean(lpips_list),
-                     "Avg FloLPIPS" : np.mean(floLpips_list),
-                     } )
-
-
     if  'SNU_FILM' in args.bench:
         print(f'=========================Starting testing=========================')
         print(f'Dataset: SNU_FILM   Model: {args.model}   TTA: {False}')
@@ -420,7 +420,7 @@ if __name__ == "__main__":
     exec(args.trainer, globals())
     created_class = globals()[args.trainer]
     
-    lpips_fn = lpips.LPIPS(net='vgg').cuda().eval() #alex,vgg,squeeze
+    lpips_fn = lpips.LPIPS(net='alex').cuda().eval() #alex,vgg,squeeze
     flolpips_fn = Flolpips().cuda().eval()
 
     if args.resume :
