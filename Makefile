@@ -5,5 +5,5 @@ bench_Ours-B:
 	CUDA_VISIBLE_DEVICES=0  python model_benchmark.py --model Ours-B --resume Ours-B 
 
 bench_Ours-P:
-	CUDA_VISIBLE_DEVICES=0  python model_benchmark.py --model Ours-P --resume Ours-P 
+	CUDA_VISIBLE_DEVICES=0  python model_benchmark.py --model Ours-P --resume Ours-P
 

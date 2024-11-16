@@ -69,7 +69,7 @@ def Model_create(model=None):
             F = 32,
             refine=Residual_refiner,
             W=[16,16],
-            window_shift=0,
+            window_shift=-1,
             depth = [2,2,2,4,4])
         }
     
