@@ -3,7 +3,23 @@ import torch.nn as nn
 import math
 from einops import  repeat
 import torch.nn.functional as F
-from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, selective_scan_ref 
+
+try:
+    from .mamba.mamba_ssm.ops.selective_scan_interface import selective_scan_fn, selective_scan_ref 
+except:
+    from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, selective_scan_ref 
+try:
+    from .csms6s import selective_scan_fn, selective_scan_flop_jit
+except:
+    from csms6s import selective_scan_fn, selective_scan_flop_jit
+
+# FLOPs counter not prepared fro mamba2
+try:
+    from .mamba2.ssd_minimal import selective_scan_chunk_fn
+except:
+    from mamba2.ssd_minimal import selective_scan_chunk_fn
+
+
 from .hilbert_2d import * 
 
 class SW_HSS3D(nn.Module):
@@ -230,16 +246,16 @@ class SW_HSS3D(nn.Module):
         dts = dts.contiguous().float().view(B, -1, L) # B, 4 *d , L
 
         out_y = self.selective_scan(
-            xs, #u
-            dts,
-            As, 
-            Bs, 
-            Cs, 
-            Ds, 
-            z=None,
+            xs.contiguous(), #u
+            dts.contiguous(),
+            As.contiguous(), 
+            Bs.contiguous(), 
+            Cs.contiguous(), 
+            Ds.contiguous(), 
+            #z=None,
             delta_bias=None,
             delta_softplus=False,
-            return_last_state=False,
+            #return_last_state=False,
         ).view(B, K, -1, L)
 
         assert out_y.dtype == torch.float
