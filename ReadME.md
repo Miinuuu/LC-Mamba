@@ -25,6 +25,8 @@ cd kernels/selective_scan && pip install .
 Checkpoints can be downloaded from the following link:  
 [Download Checkpoints](https://www.dropbox.com/scl/fo/qqetwthteq18n53p48nwi/ALtsYM3Dse5nW5QfA5KwGEA?rlkey=lhcev43r7ltvv80cr3iszj6nj&dl=0)
 
+Please place the checkpoints in ./ckpt/.
+
 ## Dataset
 To comprehensively evaluate the proposed model's performance under various conditions and resolutions, experiments were conducted using multiple datasets.
 
