@@ -64,7 +64,7 @@ Make bench_Ours-E
 
 ## License and Acknowledgement
 
-This project is released under the **Apache 2.0 license**. 
-The code is based on **RIFE**, **EMA-VFI**,  and **VFIMamba**. Please ensure compliance with their respective licenses. 
+This project is distributed under the Apache 2.0 license. It incorporates concepts and code from RIFE, EMA-VFI, and VFIMamba, 
+and users are advised to adhere to the licensing terms of these respective projects.
 
-We would like to thank the authors of these projects for their outstanding contributions.
+We extend our gratitude to the authors of these works for their exceptional contributions.
