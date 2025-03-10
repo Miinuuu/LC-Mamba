@@ -25,57 +25,83 @@ class Motion_estimator(nn.Module):
         if self.refine != None :
             self.unet = (kargs['refine'](int(kargs['c']*2)))
 
-    def warp_features(self, xs, flows):
-        y0 = []
-        B = xs[0].size(0) // 2
+    # def warp_features(self, xs, flows):
+    #     y0 = []
+    #     B = xs[0].size(0) // 2
 
-        for i,x in enumerate(xs):
-            y0.append(
-                torch.cat( (
-                backward_warp(x[:B], flows[i][:, 0:2]),
-                backward_warp(x[B:], flows[i][:, 2:4])),1))
-        return y0
+    #     for i,x in enumerate(xs):
+    #         y0.append(
+    #             torch.cat( (
+    #             backward_warp(x[:B], flows[i][:, 0:2]),
+    #             backward_warp(x[B:], flows[i][:, 2:4])),1))
+    #     return y0
     
-    def warp_imgs(self, imgs, flows):
-        y = []
+    # def warp_imgs(self, imgs, flows):
+    #     y = []
         
-        for (img,flow) in (zip(imgs,flows)) :
-            y.append(
-                torch.cat((
-                backward_warp(img[:,:3], flow[ :,0:2]),
-                backward_warp(img[:,3:6], flow[ :,2:4])),1))
+    #     for (img,flow) in (zip(imgs,flows)) :
+    #         y.append(
+    #             torch.cat((
+    #             backward_warp(img[:,:3], flow[ :,0:2]),
+    #             backward_warp(img[:,3:6], flow[ :,2:4])),1))
             
-        return y
+    #     return y
 
     
-    def pyramid_features(self, x,level=[1,0.5,0.25],scale=False):
-        xs=[]
-        for lv in level :
-            if lv != 1.0 :
-                if scale :
-                    xs.append( F.interpolate(x, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False) * lv)                 
-                else:
-                    xs.append( F.interpolate(x, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False))
-            else:
-                xs.append(x)
-        return xs
+    # def pyramid_features(self, x,level=[1,0.5,0.25],scale=False):
+    #     xs=[]
+    #     for lv in level :
+    #         if lv != 1.0 :
+    #             if scale :
+    #                 xs.append( F.interpolate(x, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False) * lv)                 
+    #             else:
+    #                 xs.append( F.interpolate(x, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False))
+    #         else:
+    #             xs.append(x)
+    #     return xs
     
-    def u_pyramid_features(self,img,flow,mask,level=[1,0.5,0.25] ):
+    # def u_pyramid_features(self,img,flow,mask,level=[1,0.5,0.25] ):
 
-        im,f,m=[],[],[]
-        for lv in level :
-            if lv != 1.0 :
-                    im.append( F.interpolate(img, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False) )     
-                    f.append( F.interpolate(flow, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False) * lv)     
-                    m.append( F.interpolate(mask, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False) )     
+    #     im,f,m=[],[],[]
+    #     for lv in level :
+    #         if lv != 1.0 :
+    #                 im.append( F.interpolate(img, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False) )     
+    #                 f.append( F.interpolate(flow, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False) * lv)     
+    #                 m.append( F.interpolate(mask, scale_factor=lv, mode="bilinear", align_corners=False, recompute_scale_factor=False) )     
 
-            else:
-                    im.append(img)     
-                    f.append(flow)     
-                    m.append(mask)     
+    #         else:
+    #                 im.append(img)     
+    #                 f.append(flow)     
+    #                 m.append(mask)     
 
-        return im,f,m
-    
+    #     return im,f,m
+    def warp_features(self, xs, flows):
+        B = xs[0].size(0) // 2
+        return [
+            torch.cat((
+                backward_warp(x[:B], f[:, :2]),
+                backward_warp(x[B:], f[:, 2:4])
+            ), dim=1)
+            for x, f in zip(xs, flows)
+        ]
+    #@torch.jit.script_method
+    #@torch.jit.script
+    def warp_imgs(self, imgs, flows):
+        return [
+            torch.cat((
+                backward_warp(img[:, :3], f[:, :2]),
+                backward_warp(img[:, 3:6], f[:, 2:4])
+            ), dim=1)
+            for img, f in zip(imgs, flows)
+        ]
+
+    #@torch.jit.script_method
+    #@torch.jit.script_method
+    def u_pyramid_features(self, img, flow, mask, levels=[1, 0.5, 0.25]):
+        im = [F.interpolate(img, scale_factor=lv, mode="bilinear", align_corners=False) if lv != 1.0 else img for lv in levels]
+        f  = [F.interpolate(flow, scale_factor=lv, mode="bilinear", align_corners=False) * lv if lv != 1.0 else flow for lv in levels]
+        m  = [F.interpolate(mask, scale_factor=lv, mode="bilinear", align_corners=False) if lv != 1.0 else mask for lv in levels]
+        return im, f, m
     
     def calculate_flow(self, imgs, timestep, af=None, mf=None):
         img0, img1 = imgs[:, :3], imgs[:, 3:6]
@@ -208,7 +234,7 @@ class Motion_estimator(nn.Module):
 
         if self.refine :
 
-            dimgs,dflows,dmasks= self.u_pyramid_features(imgs,flow,mask,level=[1.0,0.5,0.25])
+            dimgs,dflows,dmasks= self.u_pyramid_features(imgs,flow,mask,[1.0,0.5,0.25])
             dwimgs = self.warp_imgs(dimgs, dflows)
             Cs = self.warp_features(af[:-2], dflows)
             res=(self.unet(dimgs, dwimgs, dmasks, dflows, Cs)*2)-1
@@ -260,7 +286,7 @@ class Motion_estimator(nn.Module):
             
         if self.refine :
  
-            dimgs,dflows,dmasks= self.u_pyramid_features(imgs,flow,mask,level=[1.0,0.5,0.25])
+            dimgs,dflows,dmasks= self.u_pyramid_features(imgs,flow,mask,[1.0,0.5,0.25])
             dwimgs = self.warp_imgs(dimgs, dflows)
             Cs = self.warp_features(af[:-self.flow_num_stage], dflows)
             res=(self.unet(dimgs, dwimgs, dmasks, dflows, Cs)*2)-1

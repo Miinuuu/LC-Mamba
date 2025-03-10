@@ -10,5 +10,5 @@ scikit-image
 lpips
 fvcore
 tensorboard
-causal_conv1d 1.0.0
-mamba_ssm 1.0.1
+causal_conv1d==1.0.0
+mamba_ssm==1.0.1
