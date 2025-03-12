@@ -7,5 +7,15 @@ bench_Ours-B:
 bench_Ours-P:
 	CUDA_VISIBLE_DEVICES=0  python model_benchmark.py --model Ours-P --resume Ours-P
 
-bench_Ours-P+S:
-	CUDA_VISIBLE_DEVICES=0  python model_benchmark.py --model Ours-P --resume Ours-P+S
+bench_Ours-TS:
+	CUDA_VISIBLE_DEVICES=1  python model_benchmark.py --model Ours-TS --resume Ours-TS 
+
+bench_Ours-ES:
+	CUDA_VISIBLE_DEVICES=1  python model_benchmark.py --model Ours-ES --resume Ours-ES 
+
+bench_Ours-BS:
+	CUDA_VISIBLE_DEVICES=1  python model_benchmark.py --model Ours-BS --resume Ours-BS 
+
+bench_Ours-PS:
+	CUDA_VISIBLE_DEVICES=1  python model_benchmark.py --model Ours-PS --resume Ours-PS
+
