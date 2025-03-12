@@ -73,4 +73,54 @@ def Model_create(model=None):
             depth = [2,2,2,4,4])
         }
     
+    elif model in ['Ours-TS'] :
+        
+        MODEL_CONFIG = {
+        'LOGNAME': model ,
+        'find_unused_parameters':False,
+        'MODEL_TYPE': (LC_Mamba_LFE_STFE, Motion_estimator),
+        'MODEL_ARCH': init_model_config(
+            F = 16,
+            refine=Residual_refiner,
+            W=[8,8],
+            depth = [2,2,2,2,2])
+        }
+    elif model in ['Ours-ES'] :
+        
+        MODEL_CONFIG = {
+        'LOGNAME': model ,
+        'find_unused_parameters':False,
+        'MODEL_TYPE': (LC_Mamba_LFE_STFE, Motion_estimator),
+        'MODEL_ARCH': init_model_config(
+            F = 16,
+            refine=Residual_refiner,
+            W=[8,8],
+            depth = [2,2,2,4,4])
+        }
+        
+    elif model in ['Ours-BS'] :
+        
+        MODEL_CONFIG = {
+        'LOGNAME': model ,
+        'find_unused_parameters':False,
+        'MODEL_TYPE': (LC_Mamba_LFE_STFE, Motion_estimator),
+        'MODEL_ARCH': init_model_config(
+            F = 32,
+            refine=Residual_refiner,
+            W=[8,8],
+            depth = [2,2,2,2,2])
+        }
+
+    elif model in ['Ours-PS'] :
+        MODEL_CONFIG = {
+        'LOGNAME': model ,
+        'find_unused_parameters':False,
+        'MODEL_TYPE': (LC_Mamba_LFE_STFE, Motion_estimator),
+        'MODEL_ARCH': init_model_config(
+            F = 32,
+            refine=Residual_refiner,
+            W=[8,8],
+            depth = [2,2,2,4,4])
+        }
+    
     return MODEL_CONFIG
