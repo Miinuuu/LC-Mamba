@@ -73,7 +73,7 @@ def Model_create(model=None):
             depth = [2,2,2,4,4])
         }
     
-    elif model in ['Ours-TS'] :
+    elif model in ['Ours-CS'] :
         
         MODEL_CONFIG = {
         'LOGNAME': model ,
