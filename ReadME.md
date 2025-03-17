@@ -29,7 +29,7 @@ Please place the checkpoints in ./ckpt/.
 
 
 <table>
-  <caption>Additional quantitative comparison across benchmarks</caption>
+  <caption>Additional quantitative comparison across benchmarks with Test-Time Augmentation (TTA) disabled </caption>
   <thead>
     <tr>
       <th>Method</th>
