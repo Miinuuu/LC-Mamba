@@ -27,6 +27,69 @@ Checkpoints can be downloaded from the following link:
 
 Please place the checkpoints in ./ckpt/.
 
+
+<table>
+  <caption>Additional quantitative comparison across benchmarks</caption>
+  <thead>
+    <tr>
+      <th>Method</th>
+      <th>Vimeo90K (PSNR/SSIM)</th>
+      <th>UCF101 (PSNR/SSIM)</th>
+      <th>Xiph 2K (PSNR/SSIM)</th>
+      <th>Xiph 4K (PSNR/SSIM)</th>
+      <th>M.B. (IE)</th>
+      <th>SNU-FILM Easy (PSNR/SSIM)</th>
+      <th>SNU-FILM Medium (PSNR/SSIM)</th>
+      <th>SNU-FILM Hard (PSNR/SSIM)</th>
+      <th>SNU-FILM Extreme (PSNR/SSIM)</th>
+      <th>Params (M)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ours-C</td>
+      <td>36.10/0.9801</td>
+      <td>35.38/0.9700</td>
+      <td>37.12/0.946</td>
+      <td>34.81/0.908</td>
+      <td>1.94</td>
+      <td>40.10/0.9915</td>
+      <td>36.11/0.9809</td>
+      <td>30.81/0.9405</td>
+      <td>25.69/0.8710</td>
+      <td>4.3</td>
+    </tr>
+    <tr>
+      <td>Ours-E</td>
+      <td>36.20/0.9802</td>
+      <td>35.42/0.9699</td>
+      <td>37.17/0.946</td>
+      <td>34.99/0.910</td>
+      <td>1.96</td>
+      <td>40.15/0.9912</td>
+      <td>36.19/0.9809</td>
+      <td>30.89/0.9416</td>
+      <td>25.81/0.8725</td>
+      <td>6.7</td>
+    </tr>
+    <tr>
+      <td>Ours-B</td>
+      <td>36.52/0.9810</td>
+      <td>35.47/0.9703</td>
+      <td>37.33/0.947</td>
+      <td>35.14/0.911</td>
+      <td>1.90</td>
+      <td>40.20/0.9909</td>
+      <td>36.30/0.9810</td>
+      <td>31.00/0.9417</td>
+      <td>25.83/0.8722</td>
+      <td>16.2</td>
+    </tr>
+  </tbody>
+</table>
+
+
+
 ## Dataset
 To comprehensively evaluate the proposed model's performance under various conditions and resolutions, experiments were conducted using multiple datasets.
 
