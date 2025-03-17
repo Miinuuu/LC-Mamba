@@ -124,10 +124,10 @@ The following datasets were used:
 ### Benchmarks
 Run the benchmark using the following command:
 ```bash
-Make bench_Ours-CS
-Make bench_Ours-ES
-Make bench_Ours-BS
-Make bench_Ours-PS
+Make bench_Ours-C
+Make bench_Ours-E
+Make bench_Ours-B
+# Make bench_Ours-PS
 ```
 
 ## License and Acknowledgement
