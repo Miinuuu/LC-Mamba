@@ -127,7 +127,6 @@ Run the benchmark using the following command:
 Make bench_Ours-C
 Make bench_Ours-E
 Make bench_Ours-B
-# Make bench_Ours-PS
 ```
 
 ## License and Acknowledgement
