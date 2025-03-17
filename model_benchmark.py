@@ -406,11 +406,11 @@ def bench (model,args ):
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser()
     parser.add_argument('--bench'           ,default=[ 'Xiph','Vimeo90K','UCF101','SNU_FILM','MiddleBury' ], type=str)
-    parser.add_argument('--datasets_path'   ,default='/data/datasets',type=str, help='datasets path')
-    parser.add_argument('--model'           ,default='Ours-E'          ,type=str)
-    parser.add_argument('--trainer'         ,default='Model'         ,type=str,help='trainer')
-    parser.add_argument('--resume'          ,default=None            ,type=str, help='resume')
-    parser.add_argument('--strict_model'    ,default=False           ,action='store_true'    ,help='strict model')
+    parser.add_argument('--datasets_path'   ,default='/data/datasets'   ,type=str, help='datasets path')
+    parser.add_argument('--model'           ,default='Ours-BS'           ,type=str)
+    parser.add_argument('--trainer'         ,default='Model'            ,type=str,help='trainer')
+    parser.add_argument('--resume'          ,default=None               ,type=str, help='resume')
+    parser.add_argument('--strict_model'    ,default=False              ,action='store_true',help='strict model')
 
     args = parser.parse_args()
     '''==========Model setting=========='''

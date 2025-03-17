@@ -16,6 +16,3 @@ bench_Ours-ES:
 bench_Ours-BS:
 	CUDA_VISIBLE_DEVICES=1  python model_benchmark.py --model Ours-BS --resume Ours-BS 
 
-bench_Ours-PS:
-	CUDA_VISIBLE_DEVICES=1  python model_benchmark.py --model Ours-PS --resume Ours-PS
-
