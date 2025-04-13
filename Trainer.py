@@ -79,7 +79,7 @@ class Model:
         print('---load_checkpoint---')
         print('resume : ',name)
 
-        checkpoint = (torch.load(f'ckpt/{name}.pkl'))
+        checkpoint = (torch.load(f'ckpt/{name}.pkl',weights_only=False))
 
         if training :                
             self.net.load_state_dict(checkpoint['model_state_dict'],strict=strict_model)
