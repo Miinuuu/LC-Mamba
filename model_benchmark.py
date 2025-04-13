@@ -432,9 +432,6 @@ if __name__ == "__main__":
         model.eval()
         model.device()
         
-        epoch=ckpt['epoch']
-        global_step=ckpt['global_step']
-        cur_psnr=['psnr']
         if args.strict_model :
             assert args.model == ckpt['Model']
         bench(model, args)
