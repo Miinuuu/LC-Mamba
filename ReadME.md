@@ -43,6 +43,7 @@ Please place the checkpoints in ./ckpt/.
       <th>SNU-FILM Hard (PSNR/SSIM)</th>
       <th>SNU-FILM Extreme (PSNR/SSIM)</th>
       <th>Params (M)</th>
+      <th>FLOPS (T)</th>
     </tr>
   </thead>
   <tbody>
@@ -58,6 +59,7 @@ Please place the checkpoints in ./ckpt/.
       <td>30.81/0.9405</td>
       <td>25.69/0.8710</td>
       <td>4.3</td>
+      <td>0.27</td>
     </tr>
     <tr>
       <td>Ours-E</td>
@@ -71,6 +73,7 @@ Please place the checkpoints in ./ckpt/.
       <td>30.89/0.9416</td>
       <td>25.81/0.8725</td>
       <td>6.7</td>
+      <td>0.29</td>
     </tr>
     <tr>
       <td>Ours-B</td>
@@ -84,6 +87,7 @@ Please place the checkpoints in ./ckpt/.
       <td>31.00/0.9417</td>
       <td>25.83/0.8722</td>
       <td>16.2</td>
+      <td>1.07</td>
     </tr>
   </tbody>
 </table>
