@@ -88,16 +88,12 @@ class Model:
         
         self.optimG.load_state_dict(checkpoint['optimizer_state_dict'])
         
-        
-        epoch = checkpoint['epoch']
-        global_step = checkpoint['global_step']
+    
         psnr = checkpoint['psnr']
         name = checkpoint['name']
 
         print('model:',name)
         print('psnr:',psnr)
-        print('epoch:',epoch)
-        print('global_step:',global_step)
 
         return {'Model':name ,'epoch':epoch,'global_step':global_step,'psnr':psnr}
 
