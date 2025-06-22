@@ -23,7 +23,7 @@ cd kernels/selective_scan && pip install .
 
 ## Checkpoints
 Checkpoints can be downloaded from the following link:  
-[Download Checkpoints](https://www.dropbox.com/scl/fo/qqetwthteq18n53p48nwi/ALtsYM3Dse5nW5QfA5KwGEA?rlkey=lhcev43r7ltvv80cr3iszj6nj&dl=0)
+[Download Checkpoints](https://drive.google.com/drive/folders/15rAb_SUE5LQXrw2My8IRcXKbkoJ0I2HF?usp=sharing)
 
 Please place the checkpoints in ./ckpt/.
 
