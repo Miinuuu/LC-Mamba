@@ -26,18 +26,22 @@ LC-Mamba is a Mamba-based **video frame interpolation (VFI)** model designed to 
 - 🪟 **Shifted local windows** — the selective scan runs inside local windows, reducing the long-range decay of historical information and strengthening multi-scale local features.
 - 🌀 **Hilbert-curve selective state scan** — tokens are ordered along a Hilbert curve so spatial continuity is preserved within *and* across window boundaries.
 - 🧊 **Voxel-level Hilbert scanning** — the curve is extended to 3D to model spatiotemporal patterns between frames.
-- 🏆 **36.52 dB PSNR on Vimeo90K** (Ours-B, w/o TTA).
+- 🏆 **36.53 dB PSNR on Vimeo90K** (paper, Ours-P) · **36.52 dB** with only 16.2M params (released Ours-B), w/o TTA.
 
 ---
 
 ## 📊 Results
 
-Quantitative results of the **released checkpoints** with **Test-Time Augmentation (TTA) disabled**. Best results in **bold**.
+All results are reported with **Test-Time Augmentation (TTA) disabled**. Best results among our models in **bold**.
 
-> [!NOTE]
-> The released checkpoints differ slightly from the configuration reported in the paper, so the numbers below may not exactly match the paper. See [Checkpoints](#-checkpoints) for the paper version.
+LC-Mamba has two sets of checkpoints:
 
-### Standard benchmarks
+| Version | Models | Results | Checkpoints |
+|:--|:-:|:--|:--|
+| **Released** (recommended) | Ours-C / E / B | Supplementary Table 8 | Drive main folder |
+| **Paper** | Ours-E / B / P | Main paper Table 1 | Drive `deprecated` folder |
+
+### Released checkpoints
 
 | Model | Vimeo90K<br><sub>PSNR / SSIM</sub> | UCF101<br><sub>PSNR / SSIM</sub> | Xiph-2K<br><sub>PSNR / SSIM</sub> | Xiph-4K<br><sub>PSNR / SSIM</sub> | Middlebury<br><sub>IE ↓</sub> | Params<br><sub>(M)</sub> | FLOPs<br><sub>(T)</sub> |
 |:--|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -45,13 +49,30 @@ Quantitative results of the **released checkpoints** with **Test-Time Augmentati
 | Ours-E | 36.20 / 0.9802 | 35.42 / 0.9699 | 37.17 / 0.946 | 34.99 / 0.910 | 1.96 | 6.7 | 0.29 |
 | Ours-B | **36.52 / 0.9810** | **35.47 / 0.9703** | **37.33 / 0.947** | **35.14 / 0.911** | **1.90** | 16.2 | 1.07 |
 
-### SNU-FILM
-
-| Model | Easy<br><sub>PSNR / SSIM</sub> | Medium<br><sub>PSNR / SSIM</sub> | Hard<br><sub>PSNR / SSIM</sub> | Extreme<br><sub>PSNR / SSIM</sub> |
+| Model | SNU-FILM Easy<br><sub>PSNR / SSIM</sub> | Medium<br><sub>PSNR / SSIM</sub> | Hard<br><sub>PSNR / SSIM</sub> | Extreme<br><sub>PSNR / SSIM</sub> |
 |:--|:-:|:-:|:-:|:-:|
 | Ours-C | 40.10 / **0.9915** | 36.11 / 0.9809 | 30.81 / 0.9405 | 25.69 / 0.8710 |
 | Ours-E | 40.15 / 0.9912 | 36.18 / 0.9809 | 30.89 / 0.9416 | 25.81 / **0.8725** |
 | Ours-B | **40.20** / 0.9909 | **36.30 / 0.9810** | **31.00 / 0.9417** | **25.83** / 0.8722 |
+
+<details>
+<summary><b>Paper checkpoints (main paper Table 1)</b></summary>
+
+<br>
+
+| Model | Vimeo90K<br><sub>PSNR / SSIM</sub> | UCF101<br><sub>PSNR / SSIM</sub> | Xiph-2K<br><sub>PSNR / SSIM</sub> | Xiph-4K<br><sub>PSNR / SSIM</sub> | Middlebury<br><sub>IE ↓</sub> | Params<br><sub>(M)</sub> |
+|:--|:-:|:-:|:-:|:-:|:-:|:-:|
+| Ours-E | 36.19 / 0.9803 | 35.33 / 0.9695 | 36.67 / 0.943 | 34.26 / 0.903 | 1.98 | **6.7** |
+| Ours-B | 36.43 / 0.9813 | 35.39 / 0.9698 | 36.90 / 0.945 | 34.26 / 0.904 | **1.89** | 16.2 |
+| Ours-P | **36.53 / 0.9816** | **35.42 / 0.9699** | **36.99 / 0.946** | **34.49 / 0.906** | 1.92 | 25.4 |
+
+| Model | SNU-FILM Easy<br><sub>PSNR / SSIM</sub> | Medium<br><sub>PSNR / SSIM</sub> | Hard<br><sub>PSNR / SSIM</sub> | Extreme<br><sub>PSNR / SSIM</sub> |
+|:--|:-:|:-:|:-:|:-:|
+| Ours-E | 39.82 / 0.9907 | 35.87 / 0.9797 | 30.54 / 0.9373 | 25.33 / 0.8626 |
+| Ours-B | 40.07 / **0.9909** | 36.08 / 0.9801 | 30.59 / 0.9375 | 25.35 / 0.8630 |
+| Ours-P | **40.16 / 0.9909** | **36.17 / 0.9802** | **30.72 / 0.9382** | **25.48 / 0.8645** |
+
+</details>
 
 ---
 
@@ -76,15 +97,11 @@ cd kernels/selective_scan && pip install . && cd ../..
 
 Download the pretrained weights from **[Google Drive](https://drive.google.com/drive/folders/1nmnWW-73MtSSJmnfBRTbvBjMsjNSG3To?usp=sharing)** and place them under `./ckpt/`.
 
-> [!IMPORTANT]
-> The checkpoints in the main folder are the **released versions**, which differ slightly from the paper.
-> The **original paper configuration** is available in the `deprecated` folder of the same Drive link.
+- **Main folder** — released checkpoints (**Ours-C / E / B**). Recommended.
+- **`deprecated` folder** — original paper checkpoints (**Ours-E / B / P**), for reproducing main paper Table 1.
 
-| Model | Params (M) | FLOPs (T) |
-|:--|:-:|:-:|
-| Ours-C | 4.3 | 0.27 |
-| Ours-E | 6.7 | 0.29 |
-| Ours-B | 16.2 | 1.07 |
+> [!NOTE]
+> Ours-E and Ours-B share names across both versions but are **different weights**. Check which version you load when comparing against the paper.
 
 ---
 
