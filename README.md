@@ -26,7 +26,7 @@ LC-Mamba is a Mamba-based **video frame interpolation (VFI)** model designed to 
 - 🪟 **Shifted local windows** — the selective scan runs inside local windows, reducing the long-range decay of historical information and strengthening multi-scale local features.
 - 🌀 **Hilbert-curve selective state scan** — tokens are ordered along a Hilbert curve so spatial continuity is preserved within *and* across window boundaries.
 - 🧊 **Voxel-level Hilbert scanning** — the curve is extended to 3D to model spatiotemporal patterns between frames.
-- 🏆 **36.53 dB PSNR on Vimeo90K** (paper, Ours-P) · **36.52 dB** with only 16.2M params (released Ours-B), w/o TTA.
+- 🏆 **36.53 dB PSNR on Vimeo90K** (paper, Ours-P) · **36.52 dB** with only 16.2M params (improved Ours-B), w/o TTA.
 
 ---
 
@@ -38,10 +38,10 @@ LC-Mamba has two sets of checkpoints:
 
 | Version | Models | Results | Checkpoints |
 |:--|:-:|:--|:--|
-| **Released** (recommended) | Ours-C / E / B | Supplementary Table 8 | Drive main folder |
-| **Paper** | Ours-E / B / P | Main paper Table 1 | Drive `deprecated` folder |
+| **Improved** (recommended) | Ours-C / E / B | Supplementary Table 8 | Drive main folder |
+| **Paper** (for reproducing Table 1) | Ours-E / B / P | Main paper Table 1 | Drive `deprecated` folder |
 
-### Released checkpoints
+### Improved checkpoints (recommended)
 
 | Model | Vimeo90K<br><sub>PSNR / SSIM</sub> | UCF101<br><sub>PSNR / SSIM</sub> | Xiph-2K<br><sub>PSNR / SSIM</sub> | Xiph-4K<br><sub>PSNR / SSIM</sub> | Middlebury<br><sub>IE ↓</sub> | Params<br><sub>(M)</sub> | FLOPs<br><sub>(T)</sub> |
 |:--|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -97,7 +97,7 @@ cd kernels/selective_scan && pip install . && cd ../..
 
 Download the pretrained weights from **[Google Drive](https://drive.google.com/drive/folders/1nmnWW-73MtSSJmnfBRTbvBjMsjNSG3To?usp=sharing)** and place them under `./ckpt/`.
 
-- **Main folder** — released checkpoints (**Ours-C / E / B**). Recommended.
+- **Main folder** — improved checkpoints (**Ours-C / E / B**). Recommended.
 - **`deprecated` folder** — original paper checkpoints (**Ours-E / B / P**), for reproducing main paper Table 1.
 
 > [!NOTE]
