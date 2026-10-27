@@ -32,7 +32,10 @@ LC-Mamba is a Mamba-based **video frame interpolation (VFI)** model designed to 
 
 ## 📊 Results
 
-Quantitative comparison with **Test-Time Augmentation (TTA) disabled**. Best results in **bold**.
+Quantitative results of the **released checkpoints** with **Test-Time Augmentation (TTA) disabled**. Best results in **bold**.
+
+> [!NOTE]
+> The released checkpoints differ slightly from the configuration reported in the paper, so the numbers below may not exactly match the paper. See [Checkpoints](#-checkpoints) for the paper version.
 
 ### Standard benchmarks
 
@@ -72,6 +75,10 @@ cd kernels/selective_scan && pip install . && cd ../..
 ## 📦 Checkpoints
 
 Download the pretrained weights from **[Google Drive](https://drive.google.com/drive/folders/1nmnWW-73MtSSJmnfBRTbvBjMsjNSG3To?usp=sharing)** and place them under `./ckpt/`.
+
+> [!IMPORTANT]
+> The checkpoints in the main folder are the **released versions**, which differ slightly from the paper.
+> The **original paper configuration** is available in the `deprecated` folder of the same Drive link.
 
 | Model | Params (M) | FLOPs (T) |
 |:--|:-:|:-:|
