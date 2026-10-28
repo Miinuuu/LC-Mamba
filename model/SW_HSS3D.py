@@ -108,6 +108,9 @@ class SW_HSS3D(nn.Module):
         self.register_buffer('scan_index', scan_index.clone(), persistent=False)
         self.register_buffer('merge_index', merge_index.clone(), persistent=False)
 
+        self.shift_size = list(shift_size) if isinstance(shift_size, (tuple, list)) else [shift_size, shift_size]
+        self._scan_mask_cache = {} # (B,H,W,device) -> 스캔 순서 dt 마스크
+
 
     @staticmethod
     def dt_init(dt_rank, d_inner, dt_scale=1.0, dt_init="random", dt_min=0.001, dt_max=0.1, dt_init_floor=1e-4,
@@ -232,20 +235,67 @@ class SW_HSS3D(nn.Module):
         return self.cross_merge(out_y, H, W) # B,H,W,C
 
 
-    def forward(self, x: torch.Tensor,shift_mask=None, **kwargs):
+    def window_pad(self, H, W):
         """
-        x: (B, H, W, C), H, W 는 윈도우 크기의 배수
-        shift_mask: LC_Mamba_Block.scan_mask() 의 스캔 순서 dt 마스크 (B//2*nW, K, 1, L) 또는 None
+        윈도우 크기의 배수로 맞추기 위한 중앙 패딩 (top, bottom), (left, right)
+        """
+        pads = []
+        for n, ws in ((H, self.window_size[0]), (W, self.window_size[1])):
+            pad = math.ceil(n / ws) * ws - n
+            pads.append((pad // 2, pad - pad // 2))
+        return pads
+
+    def scan_mask(self, B, H, W, device):
+        """
+        패딩 / cyclic shift 로 넘어온 토큰의 dt 를 0 으로 만드는 마스크를 스캔 순서로 변환한 것 (B//2*nW, K, 1, L), 필요 없으면 None
+        논문 (14): dt=0 이면 A=1, B=0 -> 이전 state 유지 (마스크 영역이 state 에 들어가지 않음)
+        입력 크기에만 의존하므로 크기별로 한 번만 만들고 캐시
+        """
+        key = (B, H, W, device)
+        if key not in self._scan_mask_cache:
+            (pt, pb), (pl, pr) = self.window_pad(H, W)
+            mask = None
+            if pt or pb or pl or pr:
+                mask = F.pad(torch.ones(B, 1, H, W, device=device), (pl, pr, pt, pb)) # B,1,H_p,W_p
+            if self.shift_size[0] or self.shift_size[1]:
+                H_p, W_p = H + pt + pb, W + pl + pr
+                shift_mask = torch.zeros((B, 1, H_p, W_p), device=device)
+                shift_mask[:, :, : H_p - self.shift_size[0] , : W_p - self.shift_size[1]]  = 1. # roll 로 넘어온 영역만 0
+                if mask is not None:
+                    shift_mask = shift_mask * torch.roll(mask, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(2, 3))
+                mask = shift_mask
+            if mask is not None:
+                mask = self.cross_scan(mask) # B//2*nW,K,1,L
+            if len(self._scan_mask_cache) >= 8:
+                self._scan_mask_cache.clear()
+            self._scan_mask_cache[key] = mask
+        return self._scan_mask_cache[key]
+
+    def forward(self, x: torch.Tensor, **kwargs):
+        """
+        x: (B, H, W, C), 배치 앞/뒤 절반이 프레임 0/1
         """
         B, H, W, C = x.shape
         xz = self.in_proj(x)
         x, z = xz.chunk(2, dim=-1)
 
+        # conv 는 패딩 / roll 전 원본 위치에서 수행 (패딩 토큰이나 roll 경계 반대편 토큰이 섞이지 않도록)
         x = x.permute(0, 3, 1, 2).contiguous()
         x = self.act(self.conv2d(x))
 
-        y = self.forward_core(x, shift_mask ) #b,h,w,c
+        (pt, pb), (pl, pr) = self.window_pad(H, W)
+        if pt or pb or pl or pr:
+            x = F.pad(x, (pl, pr, pt, pb))
+        shift = self.shift_size[0] or self.shift_size[1]
+        if shift:
+            x = torch.roll(x, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(2, 3)) # cyclic shift (좌상단 방향)
+
+        y = self.forward_core(x, self.scan_mask(B, H, W, x.device)) #b,h,w,c
         assert y.dtype == torch.float32
+
+        if shift:
+            y = torch.roll(y, shifts=(self.shift_size[0], self.shift_size[1]), dims=(1, 2)) # 원래 위치로 역 roll
+        y = y[:, pt:pt + H, pl:pl + W]
 
         # LayerNorm 은 토큰별 연산이라 윈도우 복원 후 적용해도 결과 동일
         y = self.out_norm(y)
