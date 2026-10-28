@@ -48,7 +48,7 @@ class LC_Mamba_Block(nn.Module):
         shortcut = input if nhwc else input.permute(0, 2, 3, 1).contiguous()
 
         # 윈도우 패딩 / shift 는 SW_HSS3D 내부에서 처리
-        x = self.self_attention(self.ln_1(shortcut)) # B,H,W,C
+        x = self.self_attention(self.ln_1(shortcut), pad_token=getattr(self.ln_1, 'bias', None)) # B,H,W,C
 
         x= shortcut * self.skip_scale + x  # B,H,W,C
 

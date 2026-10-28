@@ -43,6 +43,7 @@ class SW_HSS3D(nn.Module):
             shift_size=0,
             window_size=[8,8],
             zigzag=False,
+            conv_first=True,
             **kwargs,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
@@ -111,6 +112,7 @@ class SW_HSS3D(nn.Module):
 
         self.shift_size = list(shift_size) if isinstance(shift_size, (tuple, list)) else [shift_size, shift_size]
         self._scan_mask_cache = {} # (B,H,W,device) -> 스캔 순서 dt 마스크
+        self.conv_first = conv_first # True: conv 후 패딩 / roll, False: 기존 코드처럼 패딩 / roll 후 conv
 
 
     @staticmethod
@@ -272,24 +274,41 @@ class SW_HSS3D(nn.Module):
             self._scan_mask_cache[key] = mask
         return self._scan_mask_cache[key]
 
-    def forward(self, x: torch.Tensor, **kwargs):
+    def forward(self, x: torch.Tensor, pad_token=None, **kwargs):
         """
-        x: (B, H, W, C), 배치 앞/뒤 절반이 프레임 0/1
+        x: (B, H, W, C) ln_1 적용 후, 배치 앞/뒤 절반이 프레임 0/1
+        pad_token: conv_first=False 일 때 패딩 위치에 넣을 값 (기존 코드의 ln_1(0) = ln_1.bias), None 이면 0
         """
         B, H, W, C = x.shape
-        xz = self.in_proj(x)
-        x, z = xz.chunk(2, dim=-1)
-
-        # conv 는 패딩 / roll 전 원본 위치에서 수행 (패딩 토큰이나 roll 경계 반대편 토큰이 섞이지 않도록)
-        x = x.permute(0, 3, 1, 2).contiguous()
-        x = self.act(self.conv2d(x))
-
         (pt, pb), (pl, pr) = self.window_pad(H, W)
-        if pt or pb or pl or pr:
-            x = F.pad(x, (pl, pr, pt, pb))
+        padded = pt or pb or pl or pr
         shift = self.shift_size[0] or self.shift_size[1]
-        if shift:
-            x = torch.roll(x, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(2, 3)) # cyclic shift (좌상단 방향)
+
+        if self.conv_first:
+            # conv 를 패딩 / roll 전 원본 위치에서 수행 (패딩 토큰이나 roll 경계 반대편 토큰이 섞이지 않도록)
+            xz = self.in_proj(x)
+            x, z = xz.chunk(2, dim=-1)
+            x = x.permute(0, 3, 1, 2).contiguous()
+            x = self.act(self.conv2d(x))
+            if padded:
+                x = F.pad(x, (pl, pr, pt, pb))
+            if shift:
+                x = torch.roll(x, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(2, 3)) # cyclic shift (좌상단 방향)
+        else:
+            # 기존 코드 순서: 패딩 -> roll -> in_proj -> conv (conv 가 패딩 토큰 / roll 경계 반대편 토큰을 봄)
+            if padded:
+                x_pad = (pad_token if pad_token is not None else x.new_zeros(C)).expand(B, H + pt + pb, W + pl + pr, C).clone()
+                x_pad[:, pt:pt + H, pl:pl + W] = x
+                x = x_pad
+            if shift:
+                x = torch.roll(x, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(1, 2)) # cyclic shift (좌상단 방향)
+            xz = self.in_proj(x)
+            x, z = xz.chunk(2, dim=-1)
+            x = x.permute(0, 3, 1, 2).contiguous()
+            x = self.act(self.conv2d(x))
+            if shift:
+                z = torch.roll(z, shifts=(self.shift_size[0], self.shift_size[1]), dims=(1, 2))
+            z = z[:, pt:pt + H, pl:pl + W]
 
         y = self.forward_core(x, self.scan_mask(B, H, W, x.device)) #b,h,w,c
         assert y.dtype == torch.float32
