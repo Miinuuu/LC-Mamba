@@ -42,6 +42,7 @@ class SW_HSS3D(nn.Module):
             dtype=None,
             shift_size=0,
             window_size=[8,8],
+            zigzag=False,
             **kwargs,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
@@ -104,7 +105,7 @@ class SW_HSS3D(nn.Module):
 
         # 힐베르트 스캔 인덱스를 GPU 버퍼로 보관 (numpy 인덱싱은 매 호출 CPU->GPU 복사 + 동기화 발생)
         # persistent=False: state_dict 에 포함되지 않으므로 기존 체크포인트와 호환
-        scan_index, merge_index = hilbert_cross_scan_indices(window_size[0], window_size[1])
+        scan_index, merge_index = hilbert_cross_scan_indices(window_size[0], window_size[1], zigzag)
         self.register_buffer('scan_index', scan_index.clone(), persistent=False)
         self.register_buffer('merge_index', merge_index.clone(), persistent=False)
 

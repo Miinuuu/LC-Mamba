@@ -18,11 +18,13 @@ class LC_Mamba_LFE_STFE(nn.Module):
                  depths=[2, 2, 2, 2, 2], 
                  window_sizes=[8, 8],
                  window_shift=1,
+                 zigzag=False,
                  **kwarg):
         super().__init__()
         print('LC_Mamba_LFE_STFE')
         print('window_sizes',window_sizes)
         print('window_shift',window_shift)
+        print('zigzag',zigzag)
 
         self.depths = depths
         self.num_stages = len(embed_dims)
@@ -58,6 +60,7 @@ class LC_Mamba_LFE_STFE(nn.Module):
                                     expand=expand,
                                     window_size = window_sizes[i-self.conv_stages],
                                     shift_size =  0 if window_shift==-1  else  (0 if j%2 ==0 else window_sizes[i-self.conv_stages]//2), 
+                                    zigzag=zigzag,
                                     )for j in range(depths[i])])
 
 
@@ -70,6 +73,7 @@ class LC_Mamba_LFE_STFE(nn.Module):
                                     expand=expand,
                                     window_size =window_sizes[i-self.conv_stages],
                                     shift_size =  0 if window_shift==-1  else  (0 if j%2 ==0 else window_sizes[i-self.conv_stages]//2), 
+                                    zigzag=zigzag,
                                     )for j in range(depths[i])])
                          
 
