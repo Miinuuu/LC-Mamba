@@ -44,6 +44,7 @@ class SW_HSS3D(nn.Module):
             window_size=[8,8],
             zigzag=False,
             conv_first=True,
+            shift_mode="padding",
             **kwargs,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
@@ -112,7 +113,12 @@ class SW_HSS3D(nn.Module):
 
         self.shift_size = list(shift_size) if isinstance(shift_size, (tuple, list)) else [shift_size, shift_size]
         self._scan_mask_cache = {} # (B,H,W,device) -> 스캔 순서 dt 마스크
-        self.conv_first = conv_first # True: conv 후 패딩 / roll, False: 기존 코드처럼 패딩 / roll 후 conv
+        self.conv_first = conv_first # True: conv 후 패딩, False: 패딩 후 conv
+        if shift_mode not in ("padding", "roll"):
+            raise ValueError(f"Unknown shift_mode: {shift_mode!r}")
+        self.shift_mode = shift_mode
+        self.zigzag = zigzag
+        self._roll_plan_cache = {}
 
 
     @staticmethod
@@ -195,9 +201,12 @@ class SW_HSS3D(nn.Module):
         return y.reshape(-1, H, W, C)
 
     def forward_core(self, x: torch.Tensor,shift_mask=None):
-        B, C, H, W = x.shape # B,C,H,W (윈도우 크기 배수로 패딩된 전체 feature)
+        H, W = x.shape[-2:]
+        out_y = self._scan_sequences(self.cross_scan(x), shift_mask)
+        return self.cross_merge(out_y, H, W) # B,H,W,C
 
-        xs = self.cross_scan(x) # B//2*nW,4,C,2L
+    def _scan_sequences(self, xs, shift_mask=None):
+        """독립적인 (batch, direction, channel, length) 시퀀스에 SSM 적용."""
         B, K, _, L = xs.shape
 
         x_dbl = torch.einsum("b k d l, k c d -> b k c l", xs.view(B, K, -1, L), self.x_proj_weight) ## projection
@@ -235,23 +244,102 @@ class SW_HSS3D(nn.Module):
 
         assert out_y.dtype == torch.float
 
-        return self.cross_merge(out_y, H, W) # B,H,W,C
+        return out_y
+
+    @torch.inference_mode(False)
+    def _roll_scan_plan(self, H, W, device):
+        """roll로 만난 경계 조각을 독립 시퀀스로 분리하는 gather 인덱스.
+
+        각 방향의 Hilbert 순서는 유지하고 패딩 토큰만 생략한다. dt=0인
+        패딩을 건너뛰므로 실제 토큰의 state는 padding 모드와 같다.
+        계획은 CPU에서 크기별 한 번 생성하고 인덱스만 device에 캐시한다.
+        추론 중 생성하더라도 이후 backward에 저장할 수 있는 일반 텐서로 만든다.
+        """
+        key = (H, W, device)
+        if key not in self._roll_plan_cache:
+            w0, w1 = self.window_size
+            sh, sw = (s % ws for s, ws in zip(self.shift_size, self.window_size))
+            ph, pw = (-H) % w0, (-W) % w1
+            pt, pl = ph // 2, pw // 2
+            pb, pr = ph - pt, pw - pl
+            Hp, Wp = H + ph, W + pw
+            valid = F.pad(torch.ones(H, W, dtype=torch.bool, device='cpu'), (pl, pr, pt, pb))
+            valid = torch.roll(valid, shifts=(-sh, -sw), dims=(0, 1))
+            # 마지막 윈도우에 모인 위/아래 및 좌/우 경계 조각을 구별한다.
+            row_wrap = torch.arange(Hp, device='cpu') >= Hp - sh
+            col_wrap = torch.arange(Wp, device='cpu') >= Wp - sw
+            labels = 2 * row_wrap[:, None].long() + col_wrap[None, :].long()
+            labels = labels.masked_fill(~valid, -1)
+            labels = labels.view(Hp // w0, w0, Wp // w1, w1).permute(0, 2, 1, 3).reshape(-1, w0 * w1)
+            labels = labels.repeat(1, 2) # 프레임 0/1은 같은 공간 영역에 속한다.
+            scan_index, _ = hilbert_cross_scan_indices(w0, w1, self.zigzag)
+            labels = labels[:, scan_index] # nW, K, L
+            L = 2 * w0 * w1
+            grouped = {}
+            for window in range(labels.shape[0]):
+                for region in range(4):
+                    steps = [torch.where(labels[window, k] == region)[0] for k in range(4)]
+                    length = steps[0].numel()
+                    if length:
+                        grouped.setdefault(length, []).append(torch.stack(steps) + window * L)
+            groups = tuple(
+                (length, torch.stack(indices, dim=1).reshape(4, -1).to(device))
+                for length, indices in sorted(grouped.items())
+            )
+            if len(self._roll_plan_cache) >= 8:
+                self._roll_plan_cache.clear()
+            self._roll_plan_cache[key] = ((pt, pb, pl, pr), (sh, sw), groups)
+        return self._roll_plan_cache[key]
+
+    def forward_core_roll(self, x):
+        """원본 (B,C,H,W) 특징을 roll 후 영역별 독립 state로 스캔한다."""
+        B, C, H, W = x.shape
+        (pt, pb, pl, pr), (sh, sw), groups = self._roll_scan_plan(H, W, x.device)
+        if pt or pb or pl or pr:
+            x = F.pad(x, (pl, pr, pt, pb))
+        Hp, Wp = x.shape[-2:]
+        x = torch.roll(x, shifts=(-sh, -sw), dims=(2, 3))
+        xs = self.cross_scan(x)
+        BnW, K, _, L = xs.shape
+        pairs = B // 2
+        nW = BnW // pairs
+        flat = xs.view(pairs, nW, K, C, L).permute(0, 2, 3, 1, 4).reshape(pairs, K, C, nW * L)
+        out = flat.new_zeros(flat.shape, dtype=torch.float32)
+        for length, indices in groups:
+            index = indices[None, :, None, :].expand(pairs, K, C, -1)
+            packed = torch.gather(flat, 3, index)
+            count = indices.shape[-1] // length
+            packed = packed.view(pairs, K, C, count, length).permute(0, 3, 1, 2, 4).reshape(-1, K, C, length)
+            scanned = self._scan_sequences(packed)
+            scanned = scanned.view(pairs, count, K, C, length).permute(0, 2, 3, 1, 4).reshape(pairs, K, C, -1)
+            out = out.scatter(3, index, scanned)
+        out = out.view(pairs, K, C, nW, L).permute(0, 3, 1, 2, 4).reshape(BnW, K, C, L)
+        y = self.cross_merge(out, Hp, Wp)
+        y = torch.roll(y, shifts=(sh, sw), dims=(1, 2))
+        return y[:, pt:pt + H, pl:pl + W]
 
 
     def window_pad(self, H, W):
         """
-        윈도우 크기의 배수로 맞추기 위한 중앙 패딩 (top, bottom), (left, right)
+        cyclic roll 없이 shifted window를 구성하는 패딩 (top, bottom), (left, right).
+        기존 중앙 패딩 후 -shift만큼 이동했을 때의 윈도우 경계를 유지한다.
+        영상 양끝은 별도 윈도우에 놓이고, 모든 실제 특징은 스캔에 참여한다.
         """
         pads = []
-        for n, ws in ((H, self.window_size[0]), (W, self.window_size[1])):
-            pad = math.ceil(n / ws) * ws - n
-            pads.append((pad // 2, pad - pad // 2))
+        for n, ws, shift in zip((H, W), self.window_size, self.shift_size):
+            pad = (-n) % ws
+            before = (pad // 2 - shift) % ws
+            after = (-n - before) % ws
+            pads.append((before, after))
         return pads
 
+    @torch.inference_mode(False)
     def scan_mask(self, B, H, W, device):
         """
-        패딩 / cyclic shift 로 넘어온 토큰의 dt 를 0 으로 만드는 마스크를 스캔 순서로 변환한 것 (B//2*nW, K, 1, L), 필요 없으면 None
-        논문 (14): dt=0 이면 A=1, B=0 -> 이전 state 유지 (마스크 영역이 state 에 들어가지 않음)
+        실제 특징은 1, 패딩만 0인 마스크를 스캔 순서로 변환 (B//2*nW, K, 1, L), 필요 없으면 None.
+        dt=0이면 이전 state가 유지되어 패딩 입력이 state에 들어가지 않는다.
+        패딩 위치의 출력은 forward에서 제거한다.
+        추론에서 만든 캐시도 이후 학습에 재사용할 수 있게 일반 텐서로 만든다.
         입력 크기에만 의존하므로 크기별로 한 번만 만들고 캐시
         """
         key = (B, H, W, device)
@@ -260,13 +348,6 @@ class SW_HSS3D(nn.Module):
             mask = None
             if pt or pb or pl or pr:
                 mask = F.pad(torch.ones(B, 1, H, W, device=device), (pl, pr, pt, pb)) # B,1,H_p,W_p
-            if self.shift_size[0] or self.shift_size[1]:
-                H_p, W_p = H + pt + pb, W + pl + pr
-                shift_mask = torch.zeros((B, 1, H_p, W_p), device=device)
-                shift_mask[:, :, : H_p - self.shift_size[0] , : W_p - self.shift_size[1]]  = 1. # roll 로 넘어온 영역만 0
-                if mask is not None:
-                    shift_mask = shift_mask * torch.roll(mask, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(2, 3))
-                mask = shift_mask
             if mask is not None:
                 mask = self.cross_scan(mask) # B//2*nW,K,1,L
             if len(self._scan_mask_cache) >= 8:
@@ -282,40 +363,35 @@ class SW_HSS3D(nn.Module):
         B, H, W, C = x.shape
         (pt, pb), (pl, pr) = self.window_pad(H, W)
         padded = pt or pb or pl or pr
-        shift = self.shift_size[0] or self.shift_size[1]
-
         if self.conv_first:
-            # conv 를 패딩 / roll 전 원본 위치에서 수행 (패딩 토큰이나 roll 경계 반대편 토큰이 섞이지 않도록)
+            # 원본 위치에서 conv 후, shift가 반영된 패딩으로 윈도우를 구성
             xz = self.in_proj(x)
             x, z = xz.chunk(2, dim=-1)
             x = x.permute(0, 3, 1, 2).contiguous()
             x = self.act(self.conv2d(x))
-            if padded:
-                x = F.pad(x, (pl, pr, pt, pb))
-            if shift:
-                x = torch.roll(x, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(2, 3)) # cyclic shift (좌상단 방향)
         else:
-            # 기존 코드 순서: 패딩 -> roll -> in_proj -> conv (conv 가 패딩 토큰 / roll 경계 반대편 토큰을 봄)
+            # shift가 반영된 패딩 -> in_proj -> conv
             if padded:
                 x_pad = (pad_token if pad_token is not None else x.new_zeros(C)).expand(B, H + pt + pb, W + pl + pr, C).clone()
                 x_pad[:, pt:pt + H, pl:pl + W] = x
                 x = x_pad
-            if shift:
-                x = torch.roll(x, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(1, 2)) # cyclic shift (좌상단 방향)
             xz = self.in_proj(x)
             x, z = xz.chunk(2, dim=-1)
             x = x.permute(0, 3, 1, 2).contiguous()
             x = self.act(self.conv2d(x))
-            if shift:
-                z = torch.roll(z, shifts=(self.shift_size[0], self.shift_size[1]), dims=(1, 2))
             z = z[:, pt:pt + H, pl:pl + W]
 
-        y = self.forward_core(x, self.scan_mask(B, H, W, x.device)) #b,h,w,c
+        if self.shift_mode == "roll" and any(self.shift_size):
+            if not self.conv_first:
+                # Conv 경계 조건은 padding 모드와 동일하게 유지한다.
+                x = x[:, :, pt:pt + H, pl:pl + W].contiguous()
+            y = self.forward_core_roll(x)
+        else:
+            if self.conv_first and padded:
+                x = F.pad(x, (pl, pr, pt, pb))
+            y = self.forward_core(x, self.scan_mask(B, H, W, x.device))
+            y = y[:, pt:pt + H, pl:pl + W]
         assert y.dtype == torch.float32
-
-        if shift:
-            y = torch.roll(y, shifts=(self.shift_size[0], self.shift_size[1]), dims=(1, 2)) # 원래 위치로 역 roll
-        y = y[:, pt:pt + H, pl:pl + W]
 
         # LayerNorm 은 토큰별 연산이라 윈도우 복원 후 적용해도 결과 동일
         y = self.out_norm(y)

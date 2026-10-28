@@ -144,6 +144,22 @@ python model_benchmark.py --model Ours-B --resume Ours-B --datasets_path /path/t
 
 Logs are written to `./benchlog/`.
 
+Shifted windows default to `shift_mode="padding"`. To use cyclic shifts with
+independent SSM states for boundary regions, set the backbone option before
+creating the model:
+
+```python
+model_config = Model_create('Ours-C')
+model_config['MODEL_ARCH'][0]['shift_mode'] = 'roll'
+model = Model(-1, model_config)
+```
+
+The two modes use the same weights, Hilbert token order, and convolution boundary
+conditions for either `conv_first` setting. The roll mode packs each region into
+an independent scan and omits padding tokens, so outputs and gradients match the
+padding mode within floating-point tolerance. Scan indices are cached by input
+size; the extra gathering and separate scan calls can affect runtime.
+
 ---
 
 ## 📝 Citation
