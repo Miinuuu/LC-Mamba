@@ -16,6 +16,7 @@ def init_model_config(F=32,
                       window_shift=None,
                       zigzag=None,
                       conv_first=None,
+                      shift_mode="padding",
                       ):
     '''This function should not be modified'''
 
@@ -28,7 +29,8 @@ def init_model_config(F=32,
         'window_sizes':W or [8, 8],
         'window_shift': window_shift or 1,
         'zigzag': zigzag or False, # True: 프레임 interleave 순서를 지그재그로 (3D 경로 연속)
-        'conv_first': True if conv_first is None else conv_first, # False: 기존 코드처럼 패딩 / roll 후 conv
+        'conv_first': True if conv_first is None else conv_first, # False: shift가 반영된 패딩 후 conv
+        'shift_mode': shift_mode, # padding / roll (independent boundary states)
     }, {
         'embed_dims': embed_dims or [F, 2*F, 4*F, 8*F, 16*F],
         'scales': scales or [8,16],
