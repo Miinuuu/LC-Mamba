@@ -102,27 +102,11 @@ class SW_HSS3D(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0. else None
         self.delta_softplus=True
 
-        p = int(np.log2(window_size[0])) 
-        n = 2  
-
-        H,W=window_size[0],window_size[1]
-
-        hilbert_curve = HilbertCurve(p, n)
-
-        coords = []
-        for y in range(H):
-            for x in range(W):
-                coords.append((x, y))
-
-        hilbert_indices = []
-        for coord in coords:
-            x, y = coord
-            hilbert_index = hilbert_curve.distance_from_point([x, y])
-            hilbert_indices.append(hilbert_index)
-
-        hilbert_indices = np.array(hilbert_indices)
-        self.sorted_indices = np.argsort(hilbert_indices)
-        self.inverse_indices = np.argsort( self.sorted_indices)
+        # 힐베르트 스캔 인덱스를 GPU 버퍼로 보관 (numpy 인덱싱은 매 호출 CPU->GPU 복사 + 동기화 발생)
+        # persistent=False: state_dict 에 포함되지 않으므로 기존 체크포인트와 호환
+        scan_index, merge_index = hilbert_cross_scan_indices(window_size[0], window_size[1])
+        self.register_buffer('scan_index', scan_index.clone(), persistent=False)
+        self.register_buffer('merge_index', merge_index.clone(), persistent=False)
 
 
     @staticmethod
@@ -177,54 +161,39 @@ class SW_HSS3D(nn.Module):
         D._no_weight_decay = True
         return D
     
-    def merge_x(self, x): 
+    def cross_scan(self, x):
+        """
+        윈도우 분할 + 힐베르트 순서 + 두 프레임 interleave + 4방향(정/역) 스캔을 gather 한 번으로 수행
+        x: (B, C, H, W), 배치 앞/뒤 절반이 프레임 0/1, H, W 는 윈도우 크기의 배수
+        출력: (B//2 * nW, K, C, L), L = 2 * w0 * w1
+        """
         B, C, H, W = x.shape
-        x= x.view(B,C,H*W).transpose(1,2) # B,H*W,C 
-        x = torch.cat([x[:B//2], x[B//2:]], dim=-1).reshape(B//2, 2 * H * W, C) # 프레임 0,1을 L에 합침.
-        return x.transpose(1, 2).contiguous() # B//2,C,2L
-    
-    def unmerge_x(self, x ): 
-        B, C,L = x.shape  #B,C,2L , L=H*W 
+        w0, w1 = self.window_size
+        x = x.view(2, B // 2, C, H // w0, w0, W // w1, w1).permute(1, 3, 5, 2, 0, 4, 6).reshape(-1, C, 2 * w0 * w1)
+        BnW, L = x.shape[0], x.shape[-1]
+        K = self.scan_index.shape[0]
+        return torch.gather(x.unsqueeze(1).expand(BnW, K, C, L), 3,
+                            self.scan_index.view(1, K, 1, L).expand(BnW, K, C, L))
 
-        odd_elements = x[:, :, 1::2]  # L 차원에서 홀수 인덱스 (1, 3, 5, ...)
-        even_elements = x[:, :, 0::2]  # L 차원에서 짝수 인덱스 (0, 2, 4, ...)
-
-        # 홀수, 짝수 순서로 배치
-        x = torch.cat((even_elements, odd_elements), dim=0).view(B*2,C,L//2).contiguous()
-
-        return x
+    def cross_merge(self, y, H, W):
+        """
+        cross_scan 의 역과정: 4방향 출력을 원래 위치로 되돌려 합산 후 윈도우를 이미지로 복원
+        y: (B//2 * nW, K, C, L)
+        출력: (B, H, W, C)
+        """
+        BnW, K, C, L = y.shape
+        w0, w1 = self.window_size
+        y = torch.gather(y, 3, self.merge_index.view(1, K, 1, L).expand(BnW, K, C, L))
+        y = (y[:, 0] + y[:, 2]) + (y[:, 1] + y[:, 3]) # (hw + 역hw) + (wh + 역wh), 기존 합산 순서 유지
+        y = y.view(-1, H // w0, W // w1, C, 2, w0, w1).permute(4, 0, 1, 5, 2, 6, 3)
+        return y.reshape(-1, H, W, C)
 
     def forward_core(self, x: torch.Tensor,shift_mask=None):
-        B, C, H, W = x.shape # BNW,C,W0,W1
+        B, C, H, W = x.shape # B,C,H,W (윈도우 크기 배수로 패딩된 전체 feature)
 
-        h_ordered_tensor = apply_hilbert_curve_2d(x,self.sorted_indices)
-        h_ordered_tensor_wh = apply_hilbert_curve_2d(torch.transpose(x, dim0=2, dim1=3).contiguous(),self.sorted_indices) 
-        
-        x=h_ordered_tensor.view(B,C,H,W).contiguous()
-        x_wh=h_ordered_tensor_wh.view(B,C,W,H).contiguous() 
+        xs = self.cross_scan(x) # B//2*nW,4,C,2L
+        B, K, _, L = xs.shape
 
-        L = 2 * H * W #inter 
-        K = 4 #4방향 
-        
-        if shift_mask != None:
-            shift_mask=shift_mask.view(B,1,H,W)
-            h_ordered_tensor_wh= apply_hilbert_curve_2d(shift_mask,self.sorted_indices)
-            h_ordered_mask_wh= apply_hilbert_curve_2d(torch.transpose(shift_mask, dim0=2, dim1=3).contiguous(),self.sorted_indices) 
-            h_ordered_tensor_wh=h_ordered_tensor_wh.view(B,1,H,W).contiguous()
-            h_ordered_mask_wh=h_ordered_mask_wh.view(B,1,W,H).contiguous() 
-            shift_mask_hwwh = torch.stack([self.merge_x(h_ordered_tensor_wh), self.merge_x(h_ordered_mask_wh)], dim=1).view(B//2, 2, 1, L) # B//2,2,C,2L,  horizon,vertical
-            shift_mask_hwwh_reverse =  torch.flip(shift_mask_hwwh, dims=[-1])# sequence reverse  # B//2,2,C,2L,
-            shift_mask = torch.cat([shift_mask_hwwh,shift_mask_hwwh_reverse], dim=1) # reverse# B//2,4,C,2L,
-            shift_mask = shift_mask.float().view(B//2, -1, L).unsqueeze(-2).to(x.device) # B//2 , K , 1, L
-            
-
-        B = B // 2
-
-
-        x_hwwh = torch.stack([self.merge_x(x), self.merge_x(x_wh)], dim=1).view(B, 2, -1, L) # B//2,2,C,2L,  horizon,vertical
-        x_hwwh_reverse =  torch.flip(x_hwwh, dims=[-1])# sequence reverse  # B//2,2,C,2L,
-        xs = torch.cat([x_hwwh,x_hwwh_reverse], dim=1) # reverse# B//2,4,C,2L,
-        
         x_dbl = torch.einsum("b k d l, k c d -> b k c l", xs.view(B, K, -1, L), self.x_proj_weight) ## projection
         dts, Bs, Cs = torch.split(x_dbl, [self.dt_rank, self.d_state, self.d_state], dim=2)
         dts = torch.einsum("b k r l, k d r -> b k d l", dts.view(B, K, -1, L), self.dt_projs_weight)
@@ -260,61 +229,26 @@ class SW_HSS3D(nn.Module):
 
         assert out_y.dtype == torch.float
 
-        y= out_y[:, 0]
-        wh_y= out_y[:, 1] #B//2,C,2L
-
-        inv_y = torch.flip(out_y[:, 2:4], dims=[-1]).view(B, 2, -1, L)
-        invwh_y = inv_y[:, 1]#B//2,C,2L
-        
-        wh_y = wh_y+ invwh_y # B//2,C,2L
-
-        wh_y= self.unmerge_x(wh_y)# B,C,L
-        wh_y = reverse_hilbert_curve_2d(wh_y, self.inverse_indices , W,H)#.view(batch, channel, height, width)
-        wh_y = torch.transpose(wh_y,2,3).contiguous()
-        
-        y=  out_y[:, 0]+ inv_y[:, 0]
-        y= self.unmerge_x(y) # B,C,L
-        y = reverse_hilbert_curve_2d(y,self.inverse_indices,H,W)#.view(batch, channel, height, width)
-
-        y= y+wh_y
-        y= y.permute(0,2,3,1).contiguous()
- 
-        return y
-
-
-    def window_partition(self,x, window_size):
-        B, C, H, W = x.shape
-        x=x.permute(0,2,3,1)
-        x = x.view(B,H // window_size[0], window_size[0], W // window_size[1], window_size[1],C)
-        windows = (
-            x.permute(0, 1, 3,2,4,5).contiguous().view(-1, window_size[0],window_size[1],C)
-        )
-        return windows.permute(0,3,1,2)
-    def window_reverse(self,windows, window_size, H, W):
-        nwB, w0,w1, C = windows.shape
-        #windows = windows.view(-1, window_size[0], window_size[1], C)
-        B = int(nwB / (H * W / window_size[0] / window_size[1]))
-        x = windows.view(B, H // window_size[0], W // window_size[1], window_size[0], window_size[1], -1)
-        x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
-        return x
-
+        return self.cross_merge(out_y, H, W) # B,H,W,C
 
 
     def forward(self, x: torch.Tensor,shift_mask=None, **kwargs):
+        """
+        x: (B, H, W, C), H, W 는 윈도우 크기의 배수
+        shift_mask: LC_Mamba_Block.scan_mask() 의 스캔 순서 dt 마스크 (B//2*nW, K, 1, L) 또는 None
+        """
         B, H, W, C = x.shape
         xz = self.in_proj(x)
         x, z = xz.chunk(2, dim=-1)
-         
+
         x = x.permute(0, 3, 1, 2).contiguous()
         x = self.act(self.conv2d(x))
-        
-        x = self.window_partition(x, self.window_size) # B*NW,C,H,W
 
         y = self.forward_core(x, shift_mask ) #b,h,w,c
-        assert y.dtype == torch.float32 
+        assert y.dtype == torch.float32
 
+        # LayerNorm 은 토큰별 연산이라 윈도우 복원 후 적용해도 결과 동일
         y = self.out_norm(y)
-        y= self.window_reverse(y,self.window_size,H,W)#B,H,W,C
         y = y * F.silu(z)
         
         out = self.out_proj(y)#B,H,W,C

@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 # Hilbert Curve 설정
+from functools import lru_cache
 from typing import Iterable, List, Union
 import multiprocessing
 from multiprocessing import Pool
@@ -321,6 +322,31 @@ def reverse_hilbert_curve_2d(hilbert_tensor, inverse_indices, H, W):
     # 원래의 이미지 형태로 변환
     tensor = tensor_flat.view(B, C, H, W)
     return tensor.contiguous()
+
+@lru_cache(maxsize=None)
+def hilbert_cross_scan_indices(H, W):
+    """
+    H x W 윈도우, 2 프레임, 4 방향 힐베르트 스캔용 인덱스 테이블 (윈도우 크기마다 한 번만 계산)
+    입력 위치 j = frame * H*W + h * W + w,  스캔 step s 에서 frame = s % 2 (두 프레임을 번갈아 읽음)
+    방향 k: 0 = hilbert(HW), 1 = hilbert(WH, 전치), 2 / 3 = 0 / 1 의 역순
+    출력:
+        scan_index:  (4, 2*H*W)  scan_index[k, s] = 방향 k 의 s 번째 step 이 읽는 위치 j
+        merge_index: (4, 2*H*W)  merge_index[k, j] = 위치 j 를 읽은 step s (scan_index[k] 의 역순열)
+    """
+    hilbert_curve = HilbertCurve(int(np.log2(H)), 2)
+    hilbert_indices = [hilbert_curve.distance_from_point([x, y]) for y in range(H) for x in range(W)]
+    sorted_indices = np.argsort(np.array(hilbert_indices))
+    # 전치된 (W, H) 윈도우의 힐베르트 순서를 원래 (H, W) 의 row-major 위치로 변환
+    sorted_indices_wh = (sorted_indices % H) * W + sorted_indices // H
+
+    N = H * W
+    step = np.arange(2 * N)
+    frame, pos = step % 2, step // 2
+    hw = frame * N + sorted_indices[pos]
+    wh = frame * N + sorted_indices_wh[pos]
+    scan_index = np.stack([hw, wh, hw[::-1], wh[::-1]])
+    merge_index = np.argsort(scan_index, axis=1)
+    return torch.from_numpy(scan_index.copy()), torch.from_numpy(merge_index)
 
 # 예시 사용법
 if __name__ == "__main__":

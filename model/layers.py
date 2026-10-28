@@ -117,15 +117,17 @@ def window_reverse(windows, window_size, H, W):
     return x
 
 
-def pad_if_needed(x, size, window_size):
+def pad_if_needed(x, size, window_size, return_mask=True):
     b, h, w, c = size
     pad_h = math.ceil(h / window_size[0]) * window_size[0] - h
     pad_w = math.ceil(w / window_size[1]) * window_size[1] - w
     if pad_h > 0 or pad_w > 0:  # center-pad the feature on H and W axes
-        img_mask = torch.ones(b,h,w,1)  # 1 H W 1
-        img_mask = nn.functional.pad(img_mask,
-            (0, 0, pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2),
-        )
+        img_mask = None
+        if return_mask:
+            img_mask = torch.ones(b,h,w,1, device=x.device)  # 1 H W 1
+            img_mask = nn.functional.pad(img_mask,
+                (0, 0, pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2),
+            )
         return nn.functional.pad(
             x,
             (0, 0, pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2),

@@ -104,8 +104,10 @@ class LC_Mamba_LFE_STFE(nn.Module):
                 x = block(x)
             else:
                 x= patch_embed(x)
+                x = x.permute(0, 2, 3, 1).contiguous() # 블록 사이는 NHWC 로 전달
                 for blk in block:
-                    x = blk(x)
+                    x = blk(x, nhwc=True)
+                x = x.permute(0, 3, 1, 2).contiguous()
 
             appearence_features.append(x)
         return appearence_features
